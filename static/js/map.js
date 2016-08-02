@@ -881,6 +881,11 @@ function initMap () { // eslint-disable-line no-unused-vars
     redrawPokemon(mapData.pokemons)
     redrawPokemon(mapData.lurePokemons)
   })
+
+  $('#scan-here').on('click', function () {
+    var loc = map.getCenter()
+    changeLocation(loc.lat(), loc.lng())
+  })
 }
 
 function createSearchMarker () {
