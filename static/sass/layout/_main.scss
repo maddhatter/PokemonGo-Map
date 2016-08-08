@@ -53,4 +53,7 @@ html, body {
   left: 50%;
   margin-left: -15px;
   bottom: 1.5em;
+  &.disabled {
+    opacity: 0.5;
+  }
 }
