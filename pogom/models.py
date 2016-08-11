@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 args = get_args()
 flaskDb = FlaskDB()
 
-db_schema_version = 2
+db_schema_version = 3
 
 
 class MyRetryDB(RetryOperationalError, PooledMySQLDatabase):
@@ -241,6 +241,7 @@ class Gym(BaseModel):
     latitude = DoubleField()
     longitude = DoubleField()
     last_modified = DateTimeField(index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
 
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
@@ -514,6 +515,9 @@ def database_migrate(db, old_ver):
 
     if old_ver < 2:
         migrate(migrator.add_column('pokestop', 'encounter_id', CharField(max_length=50, null=True)))
+
+    if old_ver < 3:
+        migrate(migrator.add_column('gym', 'updated_at', DateTimeField(null=True)))
 
     # Update database schema version
     Versions.update(val=db_schema_version).where(Versions.key == 'schema_version').execute()

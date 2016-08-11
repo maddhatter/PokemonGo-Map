@@ -1004,8 +1004,16 @@ function pokemonLabel (name, rarity, types, disappearTime, id, latitude, longitu
   return contentstring
 }
 
-function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
+function gymLabel (teamName, teamId, gymPoints, latitude, longitude, updatedAt) {
   var gymColor = ['0, 0, 0, .4', '74, 138, 202, .6', '240, 68, 58, .6', '254, 217, 40, .6']
+  var updatedAtStr
+  if (updatedAt) {
+    var updatedAtDate = new Date(updatedAt);
+    updatedAtStr = `${updatedAtDate.getMonth()+1}/${updatedAtDate.getDate()} ${pad(updatedAtDate.getHours())}:${pad(updatedAtDate.getMinutes())}`
+  } else {
+    updatedAtStr = "Unknown"
+  }
+  
   var str
   if (teamId === 0) {
     str = `
@@ -1017,6 +1025,9 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
           </div>
           <div>
             Location: ${latitude.toFixed(6)}, ${longitude.toFixed(7)}
+          </div>
+          <div>
+            Updated at: ${updatedAtStr}
           </div>
           <div>
             <a href='https://www.google.com/maps/dir/Current+Location/${latitude},${longitude}?hl=en' target='_blank' title='View in Maps'>Get directions</a>
@@ -1044,6 +1055,9 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
           </div>
           <div>
             Location: ${latitude.toFixed(6)}, ${longitude.toFixed(7)}
+          </div>
+          <div>
+            Updated at: ${updatedAtStr}
           </div>
           <div>
             <a href='https://www.google.com/maps/dir/Current+Location/${latitude},${longitude}?hl=en' target='_blank' title='View in Maps'>Get directions</a>
@@ -1194,7 +1208,7 @@ function setupGymMarker (item) {
   })
 
   marker.infoWindow = new google.maps.InfoWindow({
-    content: gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']),
+    content: gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude'], item['updated_at']),
     disableAutoPan: true
   })
 
@@ -1204,7 +1218,7 @@ function setupGymMarker (item) {
 
 function updateGymMarker (item, marker) {
   marker.setIcon('static/forts/' + gymTypes[item['team_id']] + '.png')
-  marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']))
+  marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude'], item['updated_at']))
   return marker
 }
 
