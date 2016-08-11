@@ -1009,11 +1009,11 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude, updatedAt) 
   var updatedAtStr
   if (updatedAt) {
     var updatedAtDate = new Date(updatedAt);
-    updatedAtStr = `${updatedAtDate.getMonth()+1}/${updatedAtDate.getDate()} ${pad(updatedAtDate.getHours())}:${pad(updatedAtDate.getMinutes())}`
+    updatedAtStr = `${updatedAtDate.getMonth() + 1}/${updatedAtDate.getDate()} ${pad(updatedAtDate.getHours())}:${pad(updatedAtDate.getMinutes())}`
   } else {
-    updatedAtStr = "Unknown"
+    updatedAtStr = 'Unknown'
   }
-  
+
   var str
   if (teamId === 0) {
     str = `
