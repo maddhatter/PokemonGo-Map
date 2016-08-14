@@ -5,7 +5,7 @@ import calendar
 import sys
 from peewee import SqliteDatabase, InsertQuery, \
     IntegerField, CharField, DoubleField, BooleanField, \
-    DateTimeField, CompositeKey, fn
+    DateTimeField, PrimaryKeyField, fn, DeleteQuery, ForeignKeyField, CompositeKey
 from playhouse.flask_utils import FlaskDB
 from playhouse.pool import PooledMySQLDatabase
 from playhouse.shortcuts import RetryOperationalError
@@ -256,6 +256,7 @@ class Gym(BaseModel):
     latitude = DoubleField()
     longitude = DoubleField()
     last_modified = DateTimeField(index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
 
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
@@ -317,6 +318,21 @@ class Versions(flaskDb.Model):
         primary_key = False
 
 
+class GymMember(BaseModel):
+    gym_id = ForeignKeyField(Gym)
+    trainer_name = CharField();
+    trainer_level = IntegerField();
+    pokemon_id = IntegerField();
+    pokemon_cp = IntegerField();
+
+
+class GymDetails(BaseModel):
+    gym_id = ForeignKeyField(Gym, primary_key=True)
+    name = CharField()
+    member_count = IntegerField()
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+
 def parse_map(map_dict, step_location):
     pokemons = {}
     pokestops = {}
@@ -369,7 +385,8 @@ def parse_map(map_dict, step_location):
                         'latitude': f['latitude'],
                         'longitude': f['longitude'],
                         'last_modified_time': f['last_modified_timestamp_ms'],
-                        'active_fort_modifier': active_fort_modifier
+                        'active_fort_modifier': f['active_fort_modifier'],
+                        'is_lured': True
                     }
                     send_to_webhook('pokestop', webhook_data)
                 else:
@@ -439,8 +456,58 @@ def parse_map(map_dict, step_location):
              pokestops_upserted,
              gyms_upserted)
 
-    return True
+    return gyms
 
+def parse_gyms(gym_responses):
+    log.info('Starting gym parsing')
+    gym_details = {}
+    gym_members = {}
+    i = 0
+    for response in gym_responses.values():
+        gym_state = response['responses']['GET_GYM_DETAILS']['gym_state']
+        gym_id = response['responses']['GET_GYM_DETAILS']['gym_state']['fort_data']['id']
+        gym_details[gym_id] = {
+            'gym_id': gym_id,
+            'name': response['responses']['GET_GYM_DETAILS']['name'],
+            'member_count': len(response['responses']['GET_GYM_DETAILS']['gym_state']['memberships']),
+        }
+
+        for member in response['responses']['GET_GYM_DETAILS']['gym_state']['memberships']:
+            gym_members[i] = {
+                'gym_id': gym_id,
+                'trainer_name': member['trainer_public_profile']['name'],
+                'trainer_level': member['trainer_public_profile']['level'],
+                'pokemon_id': member['pokemon_data']['pokemon_id'],
+                'pokemon_cp': member['pokemon_data']['cp'],
+            }
+            i += 1
+
+    gyms_upserted = 0
+    gym_members_upserted = 0
+
+    while True:
+        try:
+            flaskDb.connect_db()
+            break
+        except Exception as e:
+            log.warning('%s... Retrying', e)
+
+
+    #update gym name and how many pokemon are in it for each gym
+    gyms_upserted = len(gym_details)
+    bulk_upsert(GymDetails, gym_details)
+   
+    #get rid of all the gym members, we're going to insert new records
+    DeleteQuery(GymMember).where(GymMember.gym_id << gym_details.keys()).execute()
+
+    #insert new gym members
+    bulk_upsert(GymMember, gym_members)
+    gym_members_upserted = len(gym_members)
+
+    log.info('Upserted %d gyms and %d gym members',
+             gyms_upserted,
+             gym_members_upserted)
+        
 
 def clean_database():
     query = (ScannedLocation
@@ -463,7 +530,7 @@ def bulk_upsert(cls, data):
     step = 120
 
     while i < num_rows:
-        log.debug('Inserting items %d to %d', i, min(i + step, num_rows))
+        log.debug('Inserting items %d to %d into %s', i, min(i + step, num_rows), cls)
         try:
             InsertQuery(cls, rows=data.values()[i:min(i + step, num_rows)]).upsert().execute()
         except Exception as e:
@@ -472,17 +539,16 @@ def bulk_upsert(cls, data):
 
         i += step
 
-
 def create_tables(db):
     db.connect()
     verify_database_schema(db)
-    db.create_tables([Pokemon, Pokestop, Gym, ScannedLocation], safe=True)
+    db.create_tables([Pokemon, Pokestop, Gym, ScannedLocation, GymDetails, GymMember], safe=True)
     db.close()
 
 
 def drop_tables(db):
     db.connect()
-    db.drop_tables([Pokemon, Pokestop, Gym, ScannedLocation, Versions], safe=True)
+    db.drop_tables([Pokemon, Pokestop, Gym, ScannedLocation, Versions, GymDetails, GymMember], safe=True)
     db.close()
 
 

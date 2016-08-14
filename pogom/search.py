@@ -30,8 +30,9 @@ from pgoapi import PGoApi
 from pgoapi.utilities import f2i
 from pgoapi import utilities as util
 from pgoapi.exceptions import AuthException
+from datetime import datetime, timedelta
 
-from .models import parse_map, Pokemon
+from .models import parse_map, Pokemon, parse_gyms, GymDetails
 
 log = logging.getLogger(__name__)
 
@@ -278,7 +279,7 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
                     # Got the response, lock for parsing and do so (or fail, whatever)
                     with parse_lock:
                         try:
-                            parse_map(response_dict, step_location)
+                            gyms = parse_map(response_dict, step_location)
                             log.debug('Search step %s completed', step)
                             search_items_queue.task_done()
                             break  # All done, get out of the request-retry loop
@@ -286,6 +287,43 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
                             log.exception('Search step %s map parsing failed, retrying request in %g seconds. Username: %s', step, sleep_time, account['username'])
                             failed_total += 1
                             time.sleep(sleep_time)
+
+                if args.gym_info:
+                    gym_details = {}
+                    for gym in gyms.values():
+                        #Can only get gym details within 1km of our position
+                        distance = calc_distance(step_location, [gym['latitude'], gym['longitude']])
+                        if distance < 1:
+                            time.sleep(args.gym_delay)
+
+                            #check if we already have details on this gym (if not, get them)
+                            try:
+                                record = GymDetails.get(gym_id = gym['gym_id'])
+                                exists = True
+                            except GymDetails.DoesNotExist as e:
+                                response = gym_request(api, step_location, gym)
+                                exists = False
+                                
+                            #if we have a record of this gym already, check if it's 5min old or not (this probably should be configurable)
+                            if exists:
+                                if (record.updated_at + timedelta(minutes=5)) < datetime.utcnow():
+                                    response = gym_request(api, step_location, gym)
+                                else:
+                                    log.debug('Skipping update of gym @ %f/%f, up to date', gym['latitude'], gym['longitude'])
+                                    continue
+
+                            #make sure the gym was in range. (sometimes the API gets cranky about gyms that are ALMOST 1km away)
+                            if response['responses']['GET_GYM_DETAILS']['result'] == 2:
+                                log.warning('Gym @ %f/%f is out of range (%dkm), skipping', gym['latitude'], gym['longitude'], distance)
+                            else:
+                                gym_details[gym['gym_id']] = response
+
+                        else:
+                            log.debug('Skipping update of gym @ %f/%f, too far away', gym['latitude'], gym['longitude'])
+
+                        
+                    log.info('%d details found to be parsed', len(gym_details))
+                    parse_gyms(gym_details)
 
                 # If there's any time left between the start time and the time when we should be kicking off the next
                 # loop, hang out until its up.
@@ -338,6 +376,35 @@ def map_request(api, position):
     except Exception as e:
         log.warning('Exception while downloading map: %s', e)
         return False
+
+def gym_request(api, position, gym):
+    try:
+        log.info('Getting details for gym @ %f/%f', gym['latitude'], gym['longitude'])
+        log.info('Distance %f', calc_distance(position, [gym['latitude'], gym['longitude']]))
+        return api.get_gym_details(gym_id = gym['gym_id'],
+                                   player_latitude = f2i(position[0]),
+                                   player_longitude = f2i(position[1]),
+                                   gym_latitude = gym['latitude'],
+                                   gym_longitude = gym['longitude'])
+
+    except Exception as e:
+        log.warning('Exception while downloading gym details: %s', e)
+        return False
+
+def calc_distance(pos1, pos2):
+    R = 6378.1  # km radius of the earth
+
+    dLat = math.radians(pos1[0] - pos2[0]) 
+    dLon = math.radians(pos1[1] - pos2[1])
+
+    a = math.sin(dLat/2) * math.sin(dLat/2) + \
+        math.cos(math.radians(pos1[0])) * math.cos(math.radians(pos2[0])) * \
+        math.sin(dLon/2) * math.sin(dLon/2)
+
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    d = R * c
+
+    return d
 
 
 class TooManyLoginAttempts(Exception):
