@@ -5,10 +5,11 @@ import calendar
 import sys
 from peewee import SqliteDatabase, InsertQuery, \
     IntegerField, CharField, DoubleField, BooleanField, \
-    DateTimeField, PrimaryKeyField, fn, DeleteQuery, ForeignKeyField, CompositeKey
+    DateTimeField, PrimaryKeyField, fn, DeleteQuery, ForeignKeyField,  \
+    CompositeKey, JOIN
 from playhouse.flask_utils import FlaskDB
 from playhouse.pool import PooledMySQLDatabase
-from playhouse.shortcuts import RetryOperationalError
+from playhouse.shortcuts import RetryOperationalError, model_to_dict
 from playhouse.migrate import migrate, MySQLMigrator, SqliteMigrator
 from datetime import datetime, timedelta
 from base64 import b64encode
@@ -23,7 +24,7 @@ log = logging.getLogger(__name__)
 args = get_args()
 flaskDb = FlaskDB()
 
-db_schema_version = 5
+db_schema_version = 6
 
 
 class MyRetryDB(RetryOperationalError, PooledMySQLDatabase):
@@ -256,7 +257,7 @@ class Gym(BaseModel):
     latitude = DoubleField()
     longitude = DoubleField()
     last_modified = DateTimeField(index=True)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    last_scanned = DateTimeField(default=datetime.utcnow)
 
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
@@ -264,21 +265,29 @@ class Gym(BaseModel):
     @staticmethod
     def get_gyms(swLat, swLng, neLat, neLng):
         if swLat is None or swLng is None or neLat is None or neLng is None:
-            query = (Gym
-                     .select()
-                     .dicts())
+            results = (Gym
+                     .select(Gym, GymDetails, GymMember)
+                     .join(GymDetails, join_type=JOIN.LEFT_OUTER, on=GymDetails.gym)
+                     .join(GymMember, join_type=JOIN.LEFT_OUTER, on=GymMember.gym)
+                     .execute())
         else:
-            query = (Gym
-                     .select()
-                     .where((Gym.latitude >= swLat) &
+            results = (Gym
+                        .select(Gym, GymDetails, GymMember)
+                        .join(GymDetails, join_type=JOIN.LEFT_OUTER, on=GymDetails.gym)
+                        .join(GymMember, join_type=JOIN.LEFT_OUTER, on=GymMember.gym)
+                        .where((Gym.latitude >= swLat) &
                             (Gym.longitude >= swLng) &
                             (Gym.latitude <= neLat) &
                             (Gym.longitude <= neLng))
-                     .dicts())
+                        .execute())
+
 
         gyms = []
-        for g in query:
-            gyms.append(g)
+        for g in results:
+            g_dict = model_to_dict(g, backrefs=True)
+            for m in g_dict.get('gymmember_set', []):
+                m['pokemon_name'] = get_pokemon_name(m['pokemon_id'])
+            gyms.append(g_dict)
 
         return gyms
 
@@ -319,7 +328,7 @@ class Versions(flaskDb.Model):
 
 
 class GymMember(BaseModel):
-    gym_id = ForeignKeyField(Gym)
+    gym = ForeignKeyField(Gym)
     trainer_name = CharField();
     trainer_level = IntegerField();
     pokemon_id = IntegerField();
@@ -327,10 +336,10 @@ class GymMember(BaseModel):
 
 
 class GymDetails(BaseModel):
-    gym_id = ForeignKeyField(Gym, primary_key=True)
+    gym = ForeignKeyField(Gym, primary_key=True)
     name = CharField()
     member_count = IntegerField()
-    updated_at = DateTimeField(default=datetime.utcnow)
+    last_scanned = DateTimeField(default=datetime.utcnow)
 
 
 def parse_map(map_dict, step_location):
@@ -466,15 +475,21 @@ def parse_gyms(gym_responses):
     for response in gym_responses.values():
         gym_state = response['responses']['GET_GYM_DETAILS']['gym_state']
         gym_id = response['responses']['GET_GYM_DETAILS']['gym_state']['fort_data']['id']
+
+        if response['responses']['GET_GYM_DETAILS']['gym_state']['fort_data']['owned_by_team'] == 0:
+            member_count = 0
+        else:
+            member_count = len(response['responses']['GET_GYM_DETAILS']['gym_state']['memberships'])
+
         gym_details[gym_id] = {
-            'gym_id': gym_id,
+            'gym': gym_id,
             'name': response['responses']['GET_GYM_DETAILS']['name'],
-            'member_count': len(response['responses']['GET_GYM_DETAILS']['gym_state']['memberships']),
+            'member_count': member_count,
         }
 
         for member in response['responses']['GET_GYM_DETAILS']['gym_state']['memberships']:
             gym_members[i] = {
-                'gym_id': gym_id,
+                'gym': gym_id,
                 'trainer_name': member['trainer_public_profile']['name'],
                 'trainer_level': member['trainer_public_profile']['level'],
                 'pokemon_id': member['pokemon_data']['pokemon_id'],
@@ -498,7 +513,7 @@ def parse_gyms(gym_responses):
     bulk_upsert(GymDetails, gym_details)
    
     #get rid of all the gym members, we're going to insert new records
-    DeleteQuery(GymMember).where(GymMember.gym_id << gym_details.keys()).execute()
+    DeleteQuery(GymMember).where(GymMember.gym << gym_details.keys()).execute()
 
     #insert new gym members
     bulk_upsert(GymMember, gym_members)
@@ -616,3 +631,8 @@ def database_migrate(db, old_ver):
                  .where(Pokemon.disappear_time >
                         (datetime.utcnow() - timedelta(hours=24))))
         query.execute()
+
+    if old_ver < 6:
+        migrate(
+            migrator.add_column('gym', 'last_scanned', DateTimeField(null=True))
+        )

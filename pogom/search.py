@@ -304,9 +304,9 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
                                 response = gym_request(api, step_location, gym)
                                 exists = False
                                 
-                            #if we have a record of this gym already, check if it's 5min old or not (this probably should be configurable)
+                            #if we have a record of this gym already, check if the gym has been updated since our last update
                             if exists:
-                                if (record.updated_at + timedelta(minutes=5)) < datetime.utcnow():
+                                if record.last_scanned < gym['last_updated']:
                                     response = gym_request(api, step_location, gym)
                                 else:
                                     log.debug('Skipping update of gym @ %f/%f, up to date', gym['latitude'], gym['longitude'])
@@ -379,8 +379,7 @@ def map_request(api, position):
 
 def gym_request(api, position, gym):
     try:
-        log.info('Getting details for gym @ %f/%f', gym['latitude'], gym['longitude'])
-        log.info('Distance %f', calc_distance(position, [gym['latitude'], gym['longitude']]))
+        log.debug('Getting details for gym @ %f/%f (%f km away)', gym['latitude'], gym['longitude'], calc_distance(position, [gym['latitude'], gym['longitude']]))
         return api.get_gym_details(gym_id = gym['gym_id'],
                                    player_latitude = f2i(position[0]),
                                    player_longitude = f2i(position[1]),

@@ -1011,7 +1011,24 @@ function pokemonLabel (name, rarity, types, disappearTime, id, latitude, longitu
   return contentstring
 }
 
-function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
+function gymLabel (teamName, teamId, gymPoints, latitude, longitude, lastScanned = null, details = [], members = []) {
+  var memberStr = ''
+  for (var i = 0; i < members.length; i++) {
+    memberStr += `
+      <span class="gym-member" title="${members[i].pokemon_name} | ${members[i].trainer_name} (Lvl ${members[i].trainer_level})">
+        <i class="pokemon-sprite n${members[i].pokemon_id}"></i>
+        <span class="cp team-${teamId}">${members[i].pokemon_cp}</span>
+      </span>`
+  }
+
+  var lastScannedStr
+  if (lastScanned) {
+    var lastScannedDate = new Date(lastScanned)
+    lastScannedStr = `${lastScannedDate.getFullYear()}-${pad(lastScannedDate.getMonth() + 1)}-${lastScannedDate.getDate()} ${pad(lastScannedDate.getHours())}:${pad(lastScannedDate.getMinutes())}:${pad(lastScannedDate.getSeconds())}`
+  } else {
+    lastScannedStr = 'Unknown'
+  }
+
   var gymColor = ['0, 0, 0, .4', '74, 138, 202, .6', '240, 68, 58, .6', '254, 217, 40, .6']
   var str
   if (teamId === 0) {
@@ -1023,7 +1040,13 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
             <img height='70px' style='padding: 5px;' src='static/forts/${teamName}_large.png'>
           </div>
           <div>
+            ${details['name']}
+          </div>
+          <div>
             Location: ${latitude.toFixed(6)}, ${longitude.toFixed(7)}
+          </div>
+          <div>
+            Last Scanned: ${lastScannedStr}
           </div>
           <div>
             <a href='https://www.google.com/maps/dir/Current+Location/${latitude},${longitude}?hl=en' target='_blank' title='View in Maps'>Get directions</a>
@@ -1047,10 +1070,19 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
             <img height='70px' style='padding: 5px;' src='static/forts/${teamName}_large.png'>
           </div>
           <div>
+            ${details['name']}
+          </div>
+          <div>
             Level: ${gymLevel} | Prestige: ${gymPoints}
           </div>
           <div>
+            ${memberStr}
+          </div>
+          <div>
             Location: ${latitude.toFixed(6)}, ${longitude.toFixed(7)}
+          </div>
+          <div>
+            Last Scanned: ${lastScannedStr}
           </div>
           <div>
             <a href='https://www.google.com/maps/dir/Current+Location/${latitude},${longitude}?hl=en' target='_blank' title='View in Maps'>Get directions</a>
@@ -1183,7 +1215,7 @@ function setupGymMarker (item) {
   })
 
   marker.infoWindow = new google.maps.InfoWindow({
-    content: gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']),
+    content: gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude'], item['last_scanned'], (item['gymdetails_set'].length ? item['gymdetails_set'][0] : {}), item['gymmember_set']),
     disableAutoPan: true
   })
 
@@ -1193,7 +1225,7 @@ function setupGymMarker (item) {
 
 function updateGymMarker (item, marker) {
   marker.setIcon('static/forts/' + gymTypes[item['team_id']] + '.png')
-  marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']))
+  marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude'], item['last_scanned'], (item['gymdetails_set'].length ? item['gymdetails_set'][0] : {}), item['gymmember_set']))
   return marker
 }
 
