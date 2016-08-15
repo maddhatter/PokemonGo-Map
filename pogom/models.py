@@ -468,7 +468,6 @@ def parse_map(map_dict, step_location):
 
 
 def parse_gyms(gym_responses):
-    log.info('Starting gym parsing')
     gym_details = {}
     gym_members = {}
     i = 0
@@ -493,7 +492,7 @@ def parse_gyms(gym_responses):
             'longitude': gym_state['fort_data']['longitude'],
             'team': gym_state['fort_data']['owned_by_team'],
             'name': response['responses']['GET_GYM_DETAILS']['name'],
-            'name': response['responses']['GET_GYM_DETAILS']['urls'][0],
+            'url': response['responses']['GET_GYM_DETAILS']['urls'][0],
             'pokemon': []
         }
 
