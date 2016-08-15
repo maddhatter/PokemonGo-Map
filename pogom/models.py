@@ -337,7 +337,6 @@ class GymMember(BaseModel):
 class GymDetails(BaseModel):
     gym = ForeignKeyField(Gym, primary_key=True)
     name = CharField()
-    member_count = IntegerField()
     last_scanned = DateTimeField(default=datetime.utcnow)
 
 
@@ -475,15 +474,9 @@ def parse_gyms(gym_responses):
         gym_state = response['responses']['GET_GYM_DETAILS']['gym_state']
         gym_id = gym_state['fort_data']['id']
 
-        if gym_state['fort_data']['owned_by_team'] == 0:
-            member_count = 0
-        else:
-            member_count = len(gym_state['memberships'])
-
         gym_details[gym_id] = {
             'gym': gym_id,
             'name': response['responses']['GET_GYM_DETAILS']['name'],
-            'member_count': member_count,
         }
 
         webhook_data = {
@@ -653,3 +646,5 @@ def database_migrate(db, old_ver):
         migrate(
             migrator.add_column('gym', 'last_scanned', DateTimeField(null=True))
         )
+
+
