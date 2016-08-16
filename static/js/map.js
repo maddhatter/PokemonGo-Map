@@ -917,6 +917,9 @@ function createSearchMarker () {
     zIndex: google.maps.Marker.MAX_ZINDEX + 1
   })
 
+  if (!marker.rangeCircle && Store.get('showRanges')) {
+    marker.rangeCircle = addRangeCircle(marker, map, 'search')
+  }
   var oldLocation = null
   google.maps.event.addListener(marker, 'dragstart', function () {
     oldLocation = marker.getPosition()
@@ -927,6 +930,9 @@ function createSearchMarker () {
     changeSearchLocation(newLocation.lat(), newLocation.lng())
       .done(function () {
         oldLocation = null
+        if (marker.rangeCircle && Store.get('showRanges')) {
+          marker.rangeCircle.setCenter(newLocation)
+        }
       })
       .fail(function () {
         if (oldLocation) {
@@ -1143,6 +1149,7 @@ function addRangeCircle (marker, map, type, teamId) {
   var teamColor = gymColors[0]
   if (teamId) teamColor = gymColors[teamId]
 
+  if (type === 'search') circleColor = '#ff3333'
   if (type === 'pokemon') circleColor = '#ffdd99'
   if (type === 'pokestop') circleColor = '#96F2F8'
   if (type === 'gym') circleColor = teamColor
@@ -1761,6 +1768,7 @@ function changeLocation (lat, lng) {
   changeSearchLocation(lat, lng).done(function () {
     map.setCenter(loc)
     marker.setPosition(loc)
+    if (marker.rangeCircle) marker.rangeCircle.setCenter(loc)
   })
 }
 
