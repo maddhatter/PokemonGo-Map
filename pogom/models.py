@@ -340,23 +340,24 @@ class Gym(BaseModel):
             gyms[g['gym_id']] = g
             gym_ids.append(g['gym_id'])
 
-        pokemon = (GymMember
-                   .select()
-                   .where(GymMember.gym_id << gym_ids)
-                   .order_by(GymMember.gym_id, GymMember.pokemon_cp)
-                   .dicts())
+        if len(gym_ids) > 0:
+            pokemon = (GymMember
+                       .select()
+                       .where(GymMember.gym_id << gym_ids)
+                       .order_by(GymMember.gym_id, GymMember.pokemon_cp)
+                       .dicts())
 
-        for p in pokemon:
-            p['pokemon_name'] = get_pokemon_name(p['pokemon_id'])
-            gyms[p['gym_id']]['pokemon'].append(p)
+            for p in pokemon:
+                p['pokemon_name'] = get_pokemon_name(p['pokemon_id'])
+                gyms[p['gym_id']]['pokemon'].append(p)
 
-        details = (GymDetails
-                   .select()
-                   .where(GymDetails.gym_id << gym_ids)
-                   .dicts())
+            details = (GymDetails
+                       .select()
+                       .where(GymDetails.gym_id << gym_ids)
+                       .dicts())
 
-        for d in details:
-            gyms[d['gym_id']]['name'] = d['name']
+            for d in details:
+                gyms[d['gym_id']]['name'] = d['name']
 
         return gyms
 
