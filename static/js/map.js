@@ -1189,7 +1189,7 @@ function setupGymMarker (item) {
       lng: item['longitude']
     },
     map: map,
-    icon: 'static/forts/' + gymTypes[item['team_id']] + (item['team_id'] === 0 ? '' : '_' + getGymLevel(item['gym_points'])) + '.png'
+    icon: 'static/forts/' + gymTypes[item['team_id']] + (item['team_id'] !== 0 ? '_' + getGymLevel(item['gym_points']) : '') + '.png'
   })
 
   marker.infoWindow = new google.maps.InfoWindow({
@@ -1202,7 +1202,7 @@ function setupGymMarker (item) {
 }
 
 function updateGymMarker (item, marker) {
-  marker.setIcon('static/forts/' + gymTypes[item['team_id']] + (item['team_id'] === 0 ? '' : '_' + getGymLevel(item['gym_points'])) + '.png')
+  marker.setIcon('static/forts/' + gymTypes[item['team_id']] + (item['team_id'] !== 0 ? '_' + getGymLevel(item['gym_points']) : '') + '.png')
   marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']))
   return marker
 }
