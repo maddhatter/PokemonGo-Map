@@ -1144,14 +1144,14 @@ function getGoogleSprite (index, sprite, displayHeight) {
 function addRangeCircle (marker, map, type, teamId) {
   var targetmap = null
   var circleCenter = new google.maps.LatLng(marker.position.lat(), marker.position.lng())
-  var gymColors = ['#ccc', '#ccccff', '#ffcccc', '#ffffcc']
+  var gymColors = ['#999999', '#0051CF', '#FF260E', '#FECC23'] // 'Uncontested', 'Mystic', 'Valor', 'Instinct']
   var circleColor = '#cccccc'
   var teamColor = gymColors[0]
   if (teamId) teamColor = gymColors[teamId]
 
-  if (type === 'search') circleColor = '#ff3333'
-  if (type === 'pokemon') circleColor = '#ffdd99'
-  if (type === 'pokestop') circleColor = '#96F2F8'
+  if (type === 'search') circleColor = '#333333'
+  if (type === 'pokemon') circleColor = '#C233F2'
+  if (type === 'pokestop') circleColor = '#3EB0FF'
   if (type === 'gym') circleColor = teamColor
 
   if (map) targetmap = map
@@ -1161,10 +1161,10 @@ function addRangeCircle (marker, map, type, teamId) {
     radius: 40,    // 40 meters
     strokeWeight: 1,
     strokeColor: circleColor,
-    strokeOpacity: 0.7,
+    strokeOpacity: 0.9,
     center: circleCenter,
     fillColor: circleColor,
-    fillOpacity: 0.25
+    fillOpacity: 0.3
   }
   var rangeCircle = new google.maps.Circle(rangeCircleOpts)
   return rangeCircle
@@ -1306,8 +1306,7 @@ function setupScannedMarker (item) {
     fillColor: getColorByDate(item['last_modified']),
     fillOpacity: 0.1,
     strokeWeight: 1,
-    strokeOpacity: 0.5,
-    strokeColor: getColorByDate(item['last_modified'])
+    strokeOpacity: 0.5
   })
 
   return marker
