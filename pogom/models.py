@@ -557,13 +557,13 @@ def parse_gyms(gym_responses):
             'id': gym_id,
             'latitude': gym_state['fort_data']['latitude'],
             'longitude': gym_state['fort_data']['longitude'],
-            'team': gym_state['fort_data']['owned_by_team'],
+            'team': gym_state['fort_data'].get('owned_by_team', 0),
             'name': g['name'],
             'url': g['urls'][0],
             'pokemon': []
         }
 
-        for member in gym_state['memberships']:
+        for member in gym_state.get('memberships', []):
             gym_members[i] = {
                 'gym_id': gym_id,
                 'trainer_name': member['trainer_public_profile']['name'],
