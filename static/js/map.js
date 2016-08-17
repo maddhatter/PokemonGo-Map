@@ -917,7 +917,7 @@ function createSearchMarker () {
     zIndex: google.maps.Marker.MAX_ZINDEX + 1
   })
 
-  if (!marker.rangeCircle && Store.get('showRanges')) {
+  if (!marker.rangeCircle && isRangeActive(map)) {
     marker.rangeCircle = addRangeCircle(marker, map, 'search')
   }
   var oldLocation = null
@@ -1170,6 +1170,11 @@ function addRangeCircle (marker, map, type, teamId) {
   return rangeCircle
 }
 
+function isRangeActive (map) {
+  if (map.getZoom() < 16) return false
+  return Store.get('showRanges')
+}
+
 function setupPokemonMarker (item, skipNotification, isBounceDisabled) {
   // Scale icon size up with the map exponentially
   var iconSize = 2 + (map.getZoom() - 3) * (map.getZoom() - 3) * 0.2 + Store.get('iconSizeModifier')
@@ -1198,7 +1203,7 @@ function setupPokemonMarker (item, skipNotification, isBounceDisabled) {
     this.animationDisabled = true
   })
 
-  if (!marker.rangeCircle && Store.get('showRanges')) {
+  if (!marker.rangeCircle && isRangeActive(map)) {
     marker.rangeCircle = addRangeCircle(marker, map, 'pokemon')
   }
 
@@ -1233,7 +1238,7 @@ function setupGymMarker (item) {
     icon: 'static/forts/' + gymTypes[item['team_id']] + '.png'
   })
 
-  if (!marker.rangeCircle && Store.get('showRanges')) {
+  if (!marker.rangeCircle && isRangeActive(map)) {
     marker.rangeCircle = addRangeCircle(marker, map, 'gym', item['team_id'])
   }
 
@@ -1264,7 +1269,7 @@ function setupPokestopMarker (item) {
     icon: 'static/forts/' + imagename + '.png'
   })
 
-  if (!marker.rangeCircle && Store.get('showRanges')) {
+  if (!marker.rangeCircle && isRangeActive(map)) {
     marker.rangeCircle = addRangeCircle(marker, map, 'pokestop')
   }
 
@@ -1403,11 +1408,22 @@ function showInBoundsMarkers (markers, type) {
         }
       }
     }
-    if (show && Store.get('showRanges') && rangeMarkers.indexOf(type) !== -1) {
+    // marker has an associated range
+    if (show && rangeMarkers.indexOf(type) !== -1) {
+      // no range circle yet...let's create one
       if (!marker.rangeCircle) {
-        if (type === 'gym') marker.rangeCircle = addRangeCircle(marker, map, type, markers[key].team_id)
-        else marker.rangeCircle = addRangeCircle(marker, map, type)
-      } else marker.rangeCircle.setMap(map)
+        // but only if range is active
+        if (isRangeActive(map)) {
+          if (type === 'gym') marker.rangeCircle = addRangeCircle(marker, map, type, markers[key].team_id)
+          else marker.rangeCircle = addRangeCircle(marker, map, type)
+        }
+      } else { // there's already a range circle
+        if (isRangeActive(map)) {
+          marker.rangeCircle.setMap(map)
+        } else {
+          marker.rangeCircle.setMap(null)
+        }
+      }
     }
 
     if (show && !marker.getMap()) {
