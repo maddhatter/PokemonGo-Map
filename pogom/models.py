@@ -261,10 +261,6 @@ class Gym(BaseModel):
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
 
-    @property
-    def foo(self):
-        return self._foo
-
     @staticmethod
     def get_gyms(swLat, swLng, neLat, neLng):
         if swLat is None or swLng is None or neLat is None or neLng is None:
@@ -345,11 +341,14 @@ class Versions(flaskDb.Model):
 
 
 class GymMember(BaseModel):
-    gym_id = CharField()
+    gym_id = CharField(index=True)
     trainer_name = CharField()
     trainer_level = IntegerField()
     pokemon_id = IntegerField()
     pokemon_cp = IntegerField()
+
+    class Meta:
+        primary_key = False
 
 
 class GymDetails(BaseModel):
