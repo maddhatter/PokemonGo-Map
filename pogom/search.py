@@ -293,35 +293,42 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
                         # Can only get gym details within 1km of our position
                         distance = calc_distance(step_location, [gym['latitude'], gym['longitude']])
                         if distance < 1:
-                            time.sleep(args.gym_delay)
 
+                            needsUpdated = False
                             # check if we already have details on this gym (if not, get them)
                             try:
                                 record = GymDetails.get(gym_id=gym['gym_id'])
                                 exists = True
                             except GymDetails.DoesNotExist as e:
-                                response = gym_request(api, step_location, gym)
+                                needsUpdated = True
                                 exists = False
 
                             # if we have a record of this gym already, check if the gym has been updated since our last update
                             if exists:
-                                if record.last_scanned < gym['last_updated']:
-                                    response = gym_request(api, step_location, gym)
+                                if record.last_scanned < gym['last_modified']:
+                                    needsUpdated = True
                                 else:
                                     log.debug('Skipping update of gym @ %f/%f, up to date', gym['latitude'], gym['longitude'])
                                     continue
+
+                            # do the actual request (sleep first, so we don't get insta-banned)
+                            if needsUpdated:
+                                time.sleep(args.gym_delay)
+                                response = gym_request(api, step_location, gym)
 
                             # make sure the gym was in range. (sometimes the API gets cranky about gyms that are ALMOST 1km away)
                             if response['responses']['GET_GYM_DETAILS']['result'] == 2:
                                 log.warning('Gym @ %f/%f is out of range (%dkm), skipping', gym['latitude'], gym['longitude'], distance)
                             else:
-                                gym_details[gym['gym_id']] = response
+                                gym_details[gym['gym_id']] = response['responses']['GET_GYM_DETAILS']
 
                         else:
                             log.debug('Skipping update of gym @ %f/%f, too far away', gym['latitude'], gym['longitude'])
 
-                    log.info('%d details found to be parsed', len(gym_details))
-                    parse_gyms(gym_details)
+                    log.info('%d gym(s) in range need to be updated', len(gym_details))
+
+                    if gym_details:
+                        parse_gyms(gym_details)
 
                 # If there's any time left between the start time and the time when we should be kicking off the next
                 # loop, hang out until its up.
@@ -379,11 +386,14 @@ def map_request(api, position):
 def gym_request(api, position, gym):
     try:
         log.debug('Getting details for gym @ %f/%f (%f km away)', gym['latitude'], gym['longitude'], calc_distance(position, [gym['latitude'], gym['longitude']]))
-        return api.get_gym_details(gym_id=gym['gym_id'],
-                                   player_latitude=f2i(position[0]),
-                                   player_longitude=f2i(position[1]),
-                                   gym_latitude=gym['latitude'],
-                                   gym_longitude=gym['longitude'])
+        x = api.get_gym_details(gym_id=gym['gym_id'],
+                                player_latitude=f2i(position[0]),
+                                player_longitude=f2i(position[1]),
+                                gym_latitude=gym['latitude'],
+                                gym_longitude=gym['longitude'])
+
+        # print pretty(x)
+        return x
 
     except Exception as e:
         log.warning('Exception while downloading gym details: %s', e)

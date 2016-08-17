@@ -5,11 +5,10 @@ import calendar
 import sys
 from peewee import SqliteDatabase, InsertQuery, \
     IntegerField, CharField, DoubleField, BooleanField, \
-    DateTimeField, fn, DeleteQuery, ForeignKeyField,  \
-    CompositeKey, JOIN
+    DateTimeField, fn, DeleteQuery, CompositeKey
 from playhouse.flask_utils import FlaskDB
 from playhouse.pool import PooledMySQLDatabase
-from playhouse.shortcuts import RetryOperationalError, model_to_dict
+from playhouse.shortcuts import RetryOperationalError
 from playhouse.migrate import migrate, MySQLMigrator, SqliteMigrator
 from datetime import datetime, timedelta
 from base64 import b64encode
@@ -262,31 +261,50 @@ class Gym(BaseModel):
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
 
+    @property
+    def foo(self):
+        return self._foo
+
     @staticmethod
     def get_gyms(swLat, swLng, neLat, neLng):
         if swLat is None or swLng is None or neLat is None or neLng is None:
             results = (Gym
-                       .select(Gym, GymDetails, GymMember)
-                       .join(GymDetails, join_type=JOIN.LEFT_OUTER, on=GymDetails.gym)
-                       .join(GymMember, join_type=JOIN.LEFT_OUTER, on=GymMember.gym)
-                       .execute())
+                       .select()
+                       .dicts())
         else:
             results = (Gym
-                       .select(Gym, GymDetails, GymMember)
-                       .join(GymDetails, join_type=JOIN.LEFT_OUTER, on=GymDetails.gym)
-                       .join(GymMember, join_type=JOIN.LEFT_OUTER, on=GymMember.gym)
+                       .select()
                        .where((Gym.latitude >= swLat) &
                               (Gym.longitude >= swLng) &
                               (Gym.latitude <= neLat) &
                               (Gym.longitude <= neLng))
-                       .execute())
+                       .dicts())
 
-        gyms = []
+        gyms = {}
+        gym_ids = []
         for g in results:
-            g_dict = model_to_dict(g, backrefs=True)
-            for m in g_dict.get('gymmember_set', []):
-                m['pokemon_name'] = get_pokemon_name(m['pokemon_id'])
-            gyms.append(g_dict)
+            g['name'] = None
+            g['pokemon'] = []
+            gyms[g['gym_id']] = g
+            gym_ids.append(g['gym_id'])
+
+        pokemon = (GymMember
+                   .select()
+                   .where(GymMember.gym_id << gym_ids)
+                   .order_by(GymMember.gym_id, GymMember.pokemon_cp)
+                   .dicts())
+
+        for p in pokemon:
+            p['pokemon_name'] = get_pokemon_name(p['pokemon_id'])
+            gyms[p['gym_id']]['pokemon'].append(p)
+
+        details = (GymDetails
+                   .select()
+                   .where(GymDetails.gym_id << gym_ids)
+                   .dicts())
+
+        for d in details:
+            gyms[d['gym_id']]['name'] = d['name']
 
         return gyms
 
@@ -327,7 +345,7 @@ class Versions(flaskDb.Model):
 
 
 class GymMember(BaseModel):
-    gym = ForeignKeyField(Gym)
+    gym_id = CharField()
     trainer_name = CharField()
     trainer_level = IntegerField()
     pokemon_id = IntegerField()
@@ -335,7 +353,7 @@ class GymMember(BaseModel):
 
 
 class GymDetails(BaseModel):
-    gym = ForeignKeyField(Gym, primary_key=True)
+    gym_id = CharField(primary_key=True)
     name = CharField()
     last_scanned = DateTimeField(default=datetime.utcnow)
 
@@ -470,13 +488,13 @@ def parse_gyms(gym_responses):
     gym_details = {}
     gym_members = {}
     i = 0
-    for response in gym_responses.values():
-        gym_state = response['responses']['GET_GYM_DETAILS']['gym_state']
+    for g in gym_responses.values():
+        gym_state = g['gym_state']
         gym_id = gym_state['fort_data']['id']
 
         gym_details[gym_id] = {
-            'gym': gym_id,
-            'name': response['responses']['GET_GYM_DETAILS']['name'],
+            'gym_id': gym_id,
+            'name': g['name'],
         }
 
         webhook_data = {
@@ -484,19 +502,20 @@ def parse_gyms(gym_responses):
             'latitude': gym_state['fort_data']['latitude'],
             'longitude': gym_state['fort_data']['longitude'],
             'team': gym_state['fort_data']['owned_by_team'],
-            'name': response['responses']['GET_GYM_DETAILS']['name'],
-            'url': response['responses']['GET_GYM_DETAILS']['urls'][0],
+            'name': g['name'],
+            'url': g['urls'][0],
             'pokemon': []
         }
 
         for member in gym_state['memberships']:
             gym_members[i] = {
-                'gym': gym_id,
+                'gym_id': gym_id,
                 'trainer_name': member['trainer_public_profile']['name'],
                 'trainer_level': member['trainer_public_profile']['level'],
                 'pokemon_id': member['pokemon_data']['pokemon_id'],
                 'pokemon_cp': member['pokemon_data']['cp'],
             }
+
             webhook_data['pokemon'].append({
                 'trainer': member['trainer_public_profile']['name'],
                 'pokemon': get_pokemon_name(member['pokemon_data']['pokemon_id']),
@@ -507,9 +526,6 @@ def parse_gyms(gym_responses):
 
         send_to_webhook('gym', webhook_data)
 
-    gyms_upserted = 0
-    gym_members_upserted = 0
-
     while True:
         try:
             flaskDb.connect_db()
@@ -517,20 +533,19 @@ def parse_gyms(gym_responses):
         except Exception as e:
             log.warning('%s... Retrying', e)
 
-    # update gym name and how many pokemon are in it for each gym
-    gyms_upserted = len(gym_details)
+    # update gym name and the last time we did a detailed scan
     bulk_upsert(GymDetails, gym_details)
 
     # get rid of all the gym members, we're going to insert new records
-    DeleteQuery(GymMember).where(GymMember.gym << gym_details.keys()).execute()
+    if gym_details:
+        DeleteQuery(GymMember).where(GymMember.gym_id << gym_details.keys()).execute()
 
     # insert new gym members
     bulk_upsert(GymMember, gym_members)
-    gym_members_upserted = len(gym_members)
 
     log.info('Upserted %d gyms and %d gym members',
-             gyms_upserted,
-             gym_members_upserted)
+             len(gym_details),
+             len(gym_members))
 
 
 def clean_database():
@@ -555,11 +570,11 @@ def bulk_upsert(cls, data):
 
     while i < num_rows:
         log.debug('Inserting items %d to %d into %s', i, min(i + step, num_rows), cls)
-        try:
-            InsertQuery(cls, rows=data.values()[i:min(i + step, num_rows)]).upsert().execute()
-        except Exception as e:
-            log.warning('%s... Retrying', e)
-            continue
+        # try:
+        InsertQuery(cls, rows=data.values()[i:min(i + step, num_rows)]).upsert().execute()
+        # except Exception as e:
+        #     log.warning('%s... Retrying', e)
+        #     continue
 
         i += step
 
@@ -644,7 +659,5 @@ def database_migrate(db, old_ver):
 
     if old_ver < 6:
         migrate(
-            migrator.add_column('gym', 'last_scanned', DateTimeField(null=True))
+            migrator.add_column('gym', 'last_scanned', DateTimeField(null=True)),
         )
-
-
