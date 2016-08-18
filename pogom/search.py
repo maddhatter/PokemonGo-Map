@@ -352,7 +352,6 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
                         except KeyError:
                             log.exception('Search step %s map parsing failed, retrying request in %g seconds. Username: %s', step, sleep_time, account['username'])
                             failed_total += 1
-                    time.sleep(sleep_time)
 
                 if args.gym_info:
                     gym_details = {}
@@ -380,7 +379,7 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
 
                             # do the actual request (sleep first, so we don't get insta-banned)
                             if needsUpdated:
-                                time.sleep(args.gym_delay)
+                                time.sleep(random.random() + 2)
                                 response = gym_request(api, step_location, gym)
 
                             # make sure the gym was in range. (sometimes the API gets cranky about gyms that are ALMOST 1km away)
@@ -396,6 +395,9 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
 
                     if gym_details:
                         parse_gyms(gym_details)
+
+                # sleep before stepping again
+                time.sleep(sleep_time)
 
                 # If there's any time left between the start time and the time when we should be kicking off the next
                 # loop, hang out until its up.
