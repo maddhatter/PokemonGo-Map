@@ -142,8 +142,6 @@ def get_args():
                         nargs='*', default=False, dest='webhooks')
     parser.add_argument('-gi', '--gym-info', help='Get all details about gyms (causes an additional API hit for every gym)',
                         action='store_true', default=False)
-    parser.add_argument('-gd', '--gym-delay', help='Delay between gym info API calls',
-                        type=int, default=3)
     parser.add_argument('--ssl-certificate', help='Path to SSL certificate file')
     parser.add_argument('--ssl-privatekey', help='Path to SSL private key file')
     parser.set_defaults(DEBUG=False)
