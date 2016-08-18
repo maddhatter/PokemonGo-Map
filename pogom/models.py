@@ -6,7 +6,7 @@ import sys
 import math
 from peewee import SqliteDatabase, InsertQuery, \
     IntegerField, CharField, DoubleField, BooleanField, \
-    DateTimeField, fn, DeleteQuery, CompositeKey
+    DateTimeField, fn, DeleteQuery, CompositeKey, FloatField
 from playhouse.flask_utils import FlaskDB
 from playhouse.pool import PooledMySQLDatabase
 from playhouse.shortcuts import RetryOperationalError
@@ -342,9 +342,16 @@ class Gym(BaseModel):
 
         if len(gym_ids) > 0:
             pokemon = (GymMember
-                       .select()
+                       .select(
+                           GymMember.gym_id,
+                           GymPokemon.cp.alias('pokemon_cp'),
+                           GymPokemon.pokemon_id,
+                           Trainer.name.alias('trainer_name'),
+                           Trainer.level.alias('trainer_level'))
+                       .join(GymPokemon, on=(GymMember.pokemon_uid == GymPokemon.pokemon_uid))
+                       .join(Trainer, on=(GymPokemon.trainer_name == Trainer.name))
                        .where(GymMember.gym_id << gym_ids)
-                       .order_by(GymMember.gym_id, GymMember.pokemon_cp)
+                       .order_by(GymMember.gym_id, GymPokemon.cp)
                        .dicts())
 
             for p in pokemon:
@@ -399,18 +406,44 @@ class Versions(flaskDb.Model):
 
 class GymMember(BaseModel):
     gym_id = CharField(index=True)
-    trainer_name = CharField()
-    trainer_level = IntegerField()
-    pokemon_id = IntegerField()
-    pokemon_cp = IntegerField()
+    pokemon_uid = CharField()
 
     class Meta:
         primary_key = False
 
 
+class GymPokemon(BaseModel):
+    pokemon_uid = CharField(primary_key=True)
+    pokemon_id = IntegerField()
+    cp = IntegerField()
+    trainer_name = CharField()
+    num_upgrades = IntegerField(null=True)
+    move_1 = IntegerField(null=True)
+    move_2 = IntegerField(null=True)
+    height = FloatField(null=True)
+    weight = FloatField(null=True)
+    stamina = IntegerField(null=True)
+    stamina_max = IntegerField(null=True)
+    cp_multiplier = FloatField(null=True)
+    additional_cp_multiplier = FloatField(null=True)
+    iv_defense = IntegerField(null=True)
+    iv_stamina = IntegerField(null=True)
+    iv_attack = IntegerField(null=True)
+    last_seen = DateTimeField(default=datetime.utcnow)
+
+
+class Trainer(BaseModel):
+    name = CharField(primary_key=True)
+    team = IntegerField()
+    level = IntegerField()
+    last_seen = DateTimeField(default=datetime.utcnow)
+
+
 class GymDetails(BaseModel):
     gym_id = CharField(primary_key=True)
     name = CharField()
+    description = CharField(null=True)
+    url = CharField()
     last_scanned = DateTimeField(default=datetime.utcnow)
 
 
@@ -543,6 +576,9 @@ def parse_map(map_dict, step_location):
 def parse_gyms(gym_responses):
     gym_details = {}
     gym_members = {}
+    gym_pokemon = {}
+    trainers = {}
+
     i = 0
     for g in gym_responses.values():
         gym_state = g['gym_state']
@@ -551,6 +587,8 @@ def parse_gyms(gym_responses):
         gym_details[gym_id] = {
             'gym_id': gym_id,
             'name': g['name'],
+            'description': g.get('description'),
+            'url': g['urls'][0],
         }
 
         webhook_data = {
@@ -559,24 +597,62 @@ def parse_gyms(gym_responses):
             'longitude': gym_state['fort_data']['longitude'],
             'team': gym_state['fort_data'].get('owned_by_team', 0),
             'name': g['name'],
+            'description': g.get('description'),
             'url': g['urls'][0],
-            'pokemon': []
+            'pokemon': [],
         }
 
         for member in gym_state.get('memberships', []):
             gym_members[i] = {
                 'gym_id': gym_id,
-                'trainer_name': member['trainer_public_profile']['name'],
-                'trainer_level': member['trainer_public_profile']['level'],
+                'pokemon_uid': member['pokemon_data']['id'],
+            }
+
+            gym_pokemon[i] = {
+                'pokemon_uid': member['pokemon_data']['id'],
                 'pokemon_id': member['pokemon_data']['pokemon_id'],
-                'pokemon_cp': member['pokemon_data']['cp'],
+                'cp': member['pokemon_data']['cp'],
+                'trainer_name': member['trainer_public_profile']['name'],
+                'num_upgrades': member['pokemon_data'].get('num_upgrades'),
+                'move_1': member['pokemon_data'].get('move_1'),
+                'move_2': member['pokemon_data'].get('move_2'),
+                'height': member['pokemon_data'].get('height_m'),
+                'weight': member['pokemon_data'].get('weight_kg'),
+                'stamina': member['pokemon_data'].get('stamina'),
+                'stamina_max': member['pokemon_data'].get('stamina_max'),
+                'cp_multiplier': member['pokemon_data'].get('cp_multiplier'),
+                'additional_cp_multiplier': member['pokemon_data'].get('additional_cp_multiplier'),
+                'iv_defense': member['pokemon_data'].get('individual_defense'),
+                'iv_stamina': member['pokemon_data'].get('individual_stamina'),
+                'iv_attack': member['pokemon_data'].get('individual_attack'),
+                'last_seen': datetime.utcnow(),
+            }
+
+            trainers[i] = {
+                'name': member['trainer_public_profile']['name'],
+                'team': gym_state['fort_data']['owned_by_team'],
+                'level': member['trainer_public_profile']['level'],
+                'last_seen': datetime.utcnow(),
             }
 
             webhook_data['pokemon'].append({
-                'trainer': member['trainer_public_profile']['name'],
-                'pokemon': get_pokemon_name(member['pokemon_data']['pokemon_id']),
+                'pokemon_uid': member['pokemon_data']['id'],
                 'pokemon_id': member['pokemon_data']['pokemon_id'],
                 'cp': member['pokemon_data']['cp'],
+                'num_upgrades': member['pokemon_data'].get('num_upgrades'),
+                'move_1': member['pokemon_data'].get('move_1'),
+                'move_2': member['pokemon_data'].get('move_2'),
+                'height': member['pokemon_data'].get('height_m'),
+                'weight': member['pokemon_data'].get('weight_kg'),
+                'stamina': member['pokemon_data'].get('stamina'),
+                'stamina_max': member['pokemon_data'].get('stamina_max'),
+                'cp_multiplier': member['pokemon_data'].get('cp_multiplier'),
+                'additional_cp_multiplier': member['pokemon_data'].get('additional_cp_multiplier'),
+                'iv_defense': member['pokemon_data'].get('individual_defense'),
+                'iv_stamina': member['pokemon_data'].get('individual_stamina'),
+                'iv_attack': member['pokemon_data'].get('individual_attack'),
+                'trainer_name': member['trainer_public_profile']['name'],
+                'trainer_level': member['trainer_public_profile']['level'],
             })
             i += 1
 
@@ -589,8 +665,10 @@ def parse_gyms(gym_responses):
         except Exception as e:
             log.warning('%s... Retrying', e)
 
-    # update gym name and the last time we did a detailed scan
+    # upsert all the models
     bulk_upsert(GymDetails, gym_details)
+    bulk_upsert(GymPokemon, gym_pokemon)
+    bulk_upsert(Trainer, trainers)
 
     # get rid of all the gym members, we're going to insert new records
     if gym_details:
@@ -638,13 +716,13 @@ def bulk_upsert(cls, data):
 def create_tables(db):
     db.connect()
     verify_database_schema(db)
-    db.create_tables([Pokemon, Pokestop, Gym, ScannedLocation, GymDetails, GymMember], safe=True)
+    db.create_tables([Pokemon, Pokestop, Gym, ScannedLocation, GymDetails, GymMember, GymPokemon, Trainer], safe=True)
     db.close()
 
 
 def drop_tables(db):
     db.connect()
-    db.drop_tables([Pokemon, Pokestop, Gym, ScannedLocation, Versions, GymDetails, GymMember], safe=True)
+    db.drop_tables([Pokemon, Pokestop, Gym, ScannedLocation, Versions, GymDetails, GymMember, GymPokemon, Trainer], safe=True)
     db.close()
 
 
