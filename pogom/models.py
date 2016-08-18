@@ -614,7 +614,9 @@ def parse_map(map_dict, step_location):
              pokestops_upserted,
              gyms_upserted)
 
-    return gyms
+    return {
+        'gyms': gyms,
+    }
 
 
 def parse_gyms(gym_responses):
