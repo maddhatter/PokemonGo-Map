@@ -748,11 +748,11 @@ def bulk_upsert(cls, data):
 
     while i < num_rows:
         log.debug('Inserting items %d to %d into %s', i, min(i + step, num_rows), cls)
-        # try:
-        InsertQuery(cls, rows=data.values()[i:min(i + step, num_rows)]).upsert().execute()
-        # except Exception as e:
-        #     log.warning('%s... Retrying', e)
-        #     continue
+        try:
+            InsertQuery(cls, rows=data.values()[i:min(i + step, num_rows)]).upsert().execute()
+        except Exception as e:
+            log.warning('%s... Retrying', e)
+            continue
 
         i += step
 
