@@ -620,6 +620,7 @@ var mapData = {
   spawnpoints: {}
 }
 var gymTypes = ['Uncontested', 'Mystic', 'Valor', 'Instinct']
+var gymPrestige = [2000, 4000, 8000, 12000, 16000, 20000, 30000, 40000, 50000]
 var audio = new Audio('static/sounds/ding.mp3')
 var pokemonSprites = {
   normal: {
@@ -1069,9 +1070,8 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude) {
 }
 
 function getGymLevel (points) {
-  var prestige = [2000, 4000, 8000, 12000, 16000, 20000, 30000, 40000, 50000]
   var level = 1
-  while (points >= prestige[level - 1]) {
+  while (points >= gymPrestige[level - 1]) {
     level++
   }
 
