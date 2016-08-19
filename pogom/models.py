@@ -720,13 +720,6 @@ def parse_gyms(args, gym_responses, wh_update_queue):
     # We _could_ synchronously upsert GymDetails, then queue the other tables for
     # upsert, but that would put that Gym's overall information in a weird non-atomic state.
 
-    while True:
-        try:
-            flaskDb.connect_db()
-            break
-        except Exception as e:
-            log.warning('%s... Retrying', e)
-
     # upsert all the models
     if len(gym_details):
         bulk_upsert(GymDetails, gym_details)
