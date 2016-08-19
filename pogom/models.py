@@ -362,7 +362,9 @@ class Gym(BaseModel):
                 gyms[p['gym_id']]['pokemon'].append(p)
 
             details = (GymDetails
-                       .select()
+                       .select(
+                           GymDetails.gym_id,
+                           GymDetails.name)
                        .where(GymDetails.gym_id << gym_ids)
                        .dicts())
 
