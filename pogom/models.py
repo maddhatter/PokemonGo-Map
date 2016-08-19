@@ -592,7 +592,6 @@ def parse_map(args, map_dict, step_location, db_update_queue, wh_update_queue):
     }
 
 
-
 def db_updater(args, q):
     # The forever loop
     while True:
@@ -709,13 +708,13 @@ def parse_gyms(args, gym_responses, wh_update_queue):
         if args.webhooks:
             wh_update_queue.put(('gym_details', webhook_data))
 
-    # All this database stuff is synchronous (not using the upsert queue) on purpose. 
-    # Since the search workers load the GymDetails model from the database to determine if a gym 
+    # All this database stuff is synchronous (not using the upsert queue) on purpose.
+    # Since the search workers load the GymDetails model from the database to determine if a gym
     # needs rescanned, we need to be sure the GymDetails get fully committed to the database before moving on.
-    # 
+    #
     # We _could_ synchronously upsert GymDetails, then queue the other tables for
     # upsert, but that would put that Gym's overall information in a weird non-atomic state.
-    
+
     while True:
         try:
             flaskDb.connect_db()
@@ -728,7 +727,7 @@ def parse_gyms(args, gym_responses, wh_update_queue):
         bulk_upsert(GymDetails, gym_details)
     if len(gym_pokemon):
         bulk_upsert(GymPokemon, gym_pokemon)
-    if len(trainers)
+    if len(trainers):
         bulk_upsert(Trainer, trainers)
 
     # get rid of all the gym members, we're going to insert new records
