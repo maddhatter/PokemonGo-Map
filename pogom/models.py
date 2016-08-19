@@ -349,9 +349,11 @@ class Gym(BaseModel):
                            GymPokemon.pokemon_id,
                            Trainer.name.alias('trainer_name'),
                            Trainer.level.alias('trainer_level'))
+                       .join(Gym, on=(GymMember.gym_id == Gym.gym_id))
                        .join(GymPokemon, on=(GymMember.pokemon_uid == GymPokemon.pokemon_uid))
                        .join(Trainer, on=(GymPokemon.trainer_name == Trainer.name))
                        .where(GymMember.gym_id << gym_ids)
+                       .where(GymMember.last_scanned > Gym.last_modified)
                        .order_by(GymMember.gym_id, GymPokemon.cp)
                        .dicts())
 
@@ -408,6 +410,7 @@ class Versions(flaskDb.Model):
 class GymMember(BaseModel):
     gym_id = CharField(index=True)
     pokemon_uid = CharField()
+    last_scanned = DateTimeField(default=datetime.utcnow)
 
     class Meta:
         primary_key = False
