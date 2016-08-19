@@ -1119,7 +1119,7 @@ function gymLabel (teamName, teamId, gymPoints, latitude, longitude, lastScanned
             ${nameStr}
           </div>
           <div>
-            Level: ${gymLevel} | Prestige: ${gymPoints}/${gymPrestige[gymLevel - 1]}
+            Level: ${gymLevel} | Prestige: ${gymPoints}/${gymPrestige[gymLevel - 1] || 50000}
           </div>
           <div>
             ${memberStr}
