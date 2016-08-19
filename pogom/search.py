@@ -516,7 +516,7 @@ def search_worker_thread(args, account, search_items_queue, parse_lock, encrypti
                                 gym_details[gym['gym_id']] = response['responses']['GET_GYM_DETAILS']
 
                         else:
-                            log.debug('Skipping update of gym @ %f/%f, too far away', gym['latitude'], gym['longitude'])
+                            log.debug('Skipping update of gym @ %f/%f, too far away from our location at %f/%f (%fkm)', gym['latitude'], gym['longitude'], step_location[0], step_location[1], distance)
 
                     log.info('%d gym(s) in range need to be updated', len(gym_details))
 
@@ -673,7 +673,7 @@ def map_request(api, position):
 
 def gym_request(api, position, gym):
     try:
-        log.debug('Getting details for gym @ %f/%f (%f km away)', gym['latitude'], gym['longitude'], calc_distance(position, [gym['latitude'], gym['longitude']]))
+        log.debug('Getting details for gym @ %f/%f (%fkm away)', gym['latitude'], gym['longitude'], calc_distance(position, [gym['latitude'], gym['longitude']]))
         x = api.get_gym_details(gym_id=gym['gym_id'],
                                 player_latitude=f2i(position[0]),
                                 player_longitude=f2i(position[1]),
