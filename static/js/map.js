@@ -10,6 +10,7 @@ var $selectIconResolution
 var $selectIconSize
 var $selectLuredPokestopsOnly
 var $selectSearchIconMarker
+var $selectGymMarkerStyle
 
 var language = document.documentElement.lang === '' ? 'en' : document.documentElement.lang
 var idToPokemon = {}
@@ -783,6 +784,10 @@ var StoreOptions = {
     default: 'google',
     type: StoreTypes.String
   },
+  'gymMarkerStyle': {
+    default: 'shield',
+    type: StoreTypes.String
+  },
   'zoomLevel': {
     default: 16,
     type: StoreTypes.Number
@@ -1225,7 +1230,7 @@ function setupGymMarker (item) {
       lng: item['longitude']
     },
     map: map,
-    icon: 'static/forts/' + gymTypes[item['team_id']] + (item['team_id'] !== 0 ? '_' + getGymLevel(item['gym_points']) : '') + '.png'
+    icon: 'static/forts/' + Store.get('gymMarkerStyle') + '/' + gymTypes[item['team_id']] + (item['team_id'] !== 0 ? '_' + getGymLevel(item['gym_points']) : '') + '.png'
   })
 
   marker.infoWindow = new google.maps.InfoWindow({
@@ -1238,7 +1243,7 @@ function setupGymMarker (item) {
 }
 
 function updateGymMarker (item, marker) {
-  marker.setIcon('static/forts/' + gymTypes[item['team_id']] + (item['team_id'] !== 0 ? '_' + getGymLevel(item['gym_points']) : '') + '.png')
+  marker.setIcon('static/forts/' + Store.get('gymMarkerStyle') + '/'  + gymTypes[item['team_id']] + (item['team_id'] !== 0 ? '_' + getGymLevel(item['gym_points']) : '') + '.png')
   marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']))
   return marker
 }
@@ -1892,6 +1897,19 @@ $(function () {
 
     updateSearchMarker(Store.get('lockMarker'))
   })
+
+  $selectGymMarkerStyle = $('#gym-marker-style')
+
+  $selectGymMarkerStyle.select2({
+    placeholder: 'Select Style',
+    minimumResultsForSearch: Infinity
+  })
+
+  $selectGymMarkerStyle.on('change', function (e) {
+    Store.set('gymMarkerStyle', this.value)
+  })
+
+  $selectGymMarkerStyle.val(Store.get('gymMarkerStyle')).trigger('change')
 })
 
 $(function () {
