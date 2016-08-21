@@ -4,7 +4,8 @@ var monthArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
 
 /* Main stats page */
 var rawDataIsLoading = false
-var statusPagePassword
+var statusPagePassword = false
+var groupByWorker = true
 
 /**
  * Calculate a 32 bit FNV-1a hash
@@ -62,14 +63,7 @@ function loadRawData () {
   })
 }
 
-function addMainWorker (hash) {
-  var worker = `
-    <div id="worker_${hash}" class="worker">
-      <span id="name_${hash}" class="name"></span>
-      <span id="method_${hash}" class="method"></span>
-      <span id="message_${hash}" class="message"></span>
-    </div>
-  `
+function addTable (hash) {
   var table = `
     <div class="status_table" id="table_${hash}">
       <div class="status_row header">
@@ -98,9 +92,22 @@ function addMainWorker (hash) {
     </div>
   `
 
+  table = $(table)
+  table.appendTo('#status_container')
+  table.find('.status_row.header .status_cell').click(tableSort)
+}
+
+function addMainWorker (hash) {
+  var worker = `
+    <div id="worker_${hash}" class="worker">
+      <span id="name_${hash}" class="name"></span>
+      <span id="method_${hash}" class="method"></span>
+      <span id="message_${hash}" class="message"></span>
+    </div>
+  `
+
   $(worker).appendTo('#status_container')
-  $(table).appendTo('#status_container')
-  $('.status_row.header .status_cell').click(tableSort)
+  addTable(hash)
 }
 
 function processMainWorker (i, worker) {
@@ -133,9 +140,17 @@ function addWorker (mainWorkerHash, workerHash) {
 
 function processWorker (i, worker) {
   var hash = hashFnv32a(worker['username'], true)
-  var mainWorkerHash = hashFnv32a(worker['worker_name'], true)
-  if ($('#table_' + mainWorkerHash).length === 0) {
-    return
+  var mainWorkerHash
+  if (groupByWorker) {
+    mainWorkerHash = hashFnv32a(worker['worker_name'], true)
+    if ($('#table_' + mainWorkerHash).length === 0) {
+      return
+    }
+  } else {
+    mainWorkerHash = 'global'
+    if ($('#table_global').length === 0) {
+      addTable('global')
+    }
   }
 
   if ($('#row_' + hash).length === 0) {
@@ -162,7 +177,9 @@ function processWorker (i, worker) {
 // Override UpdateMap in map.js to take advantage of a pre-existing interval.
 function updateStatus (firstRun) {
   loadRawData().done(function (result) {
-    $.each(result.main_workers, processMainWorker)
+    if (groupByWorker) {
+      $.each(result.main_workers, processMainWorker)
+    }
     $.each(result.workers, processWorker)
   })
 }
@@ -191,26 +208,35 @@ $('#password_form').submit(function (event) {
   })
 })
 
+$('#groupbyworker-switch').change(function () {
+  groupByWorker = this.checked
+  $('#status_container .status_table').remove()
+  $('#status_container .worker').remove()
+  if (statusPagePassword) {
+    updateStatus()
+  }
+})
+
 function tableSort () {
-  var table = $(this).parents('.status_table').eq(0)
-  var headRow = $(this).parent().eq(0)
-  var rows = table.find('.status_row:gt(0)').toArray().sort(compare($(this).index()))
-  this.asc = !this.asc
-  if (!this.asc) {
+  var table = $(this).parents('.status_table').eq(0)
+  var rows = table.find('.status_row:gt(0)').toArray().sort(compare($(this).index()))
+  this.asc = !this.asc
+  if (!this.asc) {
     rows = rows.reverse()
   }
-  for (var i = 0; i < rows.length; i++) {
+  for (var i = 0; i < rows.length; i++) {
     table.append(rows[i])
   }
 }
 
 function compare (index) {
-  return function(a, b) {
-    var valA = getCellValue(a, index), valB = getCellValue(b, index)
-    return $.isNumeric(valA) && $.isNumeric(valB) ? valA - valB : valA.localeCompare(valB)
-  }
+  return function (a, b) {
+    var valA = getCellValue(a, index)
+    var valB = getCellValue(b, index)
+    return $.isNumeric(valA) && $.isNumeric(valB) ? valA - valB : valA.localeCompare(valB)
+  }
 }
 
-function getCellValue(row, index) {
+function getCellValue (row, index) {
   return $(row).children('.status_cell').eq(index).html()
 }

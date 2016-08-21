@@ -24,6 +24,7 @@
     <!-- retina iPhone 6 iOS 7 -->
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/180x180.png').lstrip('/') }}" sizes="180x180">
 
+
     <link rel="stylesheet" href="{{ url_for('static', filename='dist/css/app.min.css').lstrip('/') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='dist/css/status.min.css').lstrip('/') }}">
     <script src="{{ url_for('static', filename='js/vendor/modernizr.custom.js').lstrip('/') }}"></script>
@@ -36,8 +37,24 @@
 <body>
 <!-- Header -->
 <header id="header">
+    <a href="#nav"><span class="label">Options</span></a>
     <h1><a href="..">Pokémon Go Map</a></h1>
 </header>
+<nav id="nav">
+  <div id="nav-accordion">
+    <h3>Status Settings</h3>
+    <div class="form-control switch-container">
+      <h3>Group by Workers</h3>
+      <div class="onoffswitch">
+        <input id="groupbyworker-switch" type="checkbox" name="groupbyworker-switch" class="onoffswitch-checkbox" checked>
+        <label class="onoffswitch-label" for="groupbyworker-switch">
+          <span class="switch-label" data-on="On" data-off="Off"></span>
+          <span class="switch-handle"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+</nav>
 <div id="loading"><img src="{{ url_for('static', filename='images/loading.gif').lstrip('/') }}" alt="Loading"/></div>
 <div class="status_container" id="status_container">
     <div class="status_form">
@@ -48,5 +65,6 @@
     </div>
 </div>
 <script src="{{ url_for('static', filename='dist/js/status.min.js').lstrip('/') }}"></script>
+<script src="{{ url_for('static', filename='dist/js/app.min.js').lstrip('/') }}"></script>
 </body>
 </html>
