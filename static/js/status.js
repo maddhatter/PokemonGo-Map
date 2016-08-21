@@ -4,7 +4,7 @@ var monthArray = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
 
 /* Main stats page */
 var rawDataIsLoading = false
-var statusPagePassword;
+var statusPagePassword
 
 /**
  * Calculate a 32 bit FNV-1a hash
@@ -166,27 +166,26 @@ function updateStatus (firstRun) {
   })
 }
 
-$('#password_form').submit(function( event ) {
-  event.preventDefault();
+$('#password_form').submit(function (event) {
+  event.preventDefault()
   statusPagePassword = $('#password').val()
   $.ajax({
-      url: 'status_password',
-      type: 'POST',
-      data: {
-        'password': statusPagePassword
-      },
-      dataType: 'text'
-    }).done(function (result) {
-      if (result === 'ok') {
-        $('.status_form').remove()
-        updateStatus()
-        window.setInterval(updateStatus, 5000)
-      } else if (result === 'disable') {
-        $('.status_form').remove()
-        $('<h1>Status page disabled</h1>').appendTo('#status_container')
-      } else {
-        $('.status_form').effect('bounce')
-      }
-    })
-});
-
+    url: 'status_password',
+    type: 'POST',
+    data: {
+      'password': statusPagePassword
+    },
+    dataType: 'text'
+  }).done(function (result) {
+    if (result === 'ok') {
+      $('.status_form').remove()
+      updateStatus()
+      window.setInterval(updateStatus, 5000)
+    } else if (result === 'disable') {
+      $('.status_form').remove()
+      $('<h1>Status page disabled</h1>').appendTo('#status_container')
+    } else {
+      $('.status_form').effect('bounce')
+    }
+  })
+})
