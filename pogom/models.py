@@ -587,7 +587,19 @@ def clean_db_loop(args):
             query = (ScannedLocation
                      .delete()
                      .where((ScannedLocation.last_modified <
-                            (datetime.utcnow() - timedelta(minutes=30)))))
+                             (datetime.utcnow() - timedelta(minutes=30)))))
+            query.execute()
+
+            query = (MainWorker
+                     .delete()
+                     .where((ScannedLocation.last_modified <
+                             (datetime.utcnow() - timedelta(minutes=30)))))
+            query.execute()
+
+            query = (WorkerStatus
+                     .delete()
+                     .where((ScannedLocation.last_modified <
+                             (datetime.utcnow() - timedelta(minutes=30)))))
             query.execute()
 
             # If desired, clear old pokemon spawns
