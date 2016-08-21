@@ -100,6 +100,7 @@ function addMainWorker (hash) {
 
   $(worker).appendTo('#status_container')
   $(table).appendTo('#status_container')
+  $('.status_row.header .status_cell').click(tableSort)
 }
 
 function processMainWorker (i, worker) {
@@ -189,3 +190,27 @@ $('#password_form').submit(function (event) {
     }
   })
 })
+
+function tableSort () {
+  var table = $(this).parents('.status_table').eq(0)
+  var headRow = $(this).parent().eq(0)
+  var rows = table.find('.status_row:gt(0)').toArray().sort(compare($(this).index()))
+  this.asc = !this.asc
+  if (!this.asc) {
+    rows = rows.reverse()
+  }
+  for (var i = 0; i < rows.length; i++) {
+    table.append(rows[i])
+  }
+}
+
+function compare (index) {
+  return function(a, b) {
+    var valA = getCellValue(a, index), valB = getCellValue(b, index)
+    return $.isNumeric(valA) && $.isNumeric(valB) ? valA - valB : valA.localeCompare(valB)
+  }
+}
+
+function getCellValue(row, index) {
+  return $(row).children('.status_cell').eq(index).html()
+}
