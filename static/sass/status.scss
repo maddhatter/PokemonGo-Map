@@ -1,3 +1,9 @@
+body{
+    background: #f1f1f1;
+    z-index: 0;
+    overflow: auto;
+}
+
 .wrapper {
   margin: 0 auto;
   padding: 40px;
@@ -6,9 +12,12 @@
 
 .status_table {
   margin: 0 0 40px 0;
-  width: 100%;
+  width: 95%;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   display: table;
+  font-size: 0.8em;
+  margin-left: auto;
+  margin-right: auto;
   @media screen and (max-width: 580px) {
     display: block;
   }
@@ -32,16 +41,18 @@
 }
 
 .status_cell {
-  padding: 6px 12px;
+  padding: 6px 1px;
   display: table-cell;
   @media screen and (max-width: 580px) {
-    padding: 2px 12px;
+    padding: 2px 1px;
     display: block;
   }
 }
 
 .worker {
-  width: auto;
+  width: 95%;
+  margin-left: auto;
+  margin-right: auto;
   display: block;
   padding-left: 2px;
   padding-right: 2px;
