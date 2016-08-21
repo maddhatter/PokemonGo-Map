@@ -4,7 +4,7 @@
 import calendar
 import logging
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request
 from flask.json import JSONEncoder
 from flask_compress import Compress
 from datetime import datetime
@@ -34,6 +34,7 @@ class Pogom(Flask):
         self.route("/search_control", methods=['POST'])(self.post_search_control)
         self.route("/stats", methods=['GET'])(self.get_stats)
         self.route("/status", methods=['GET'])(self.get_status)
+        self.route("/status_password", methods=['POST'])(self.post_status_password)
 
     def set_search_control(self, control):
         self.search_control = control
@@ -113,8 +114,13 @@ class Pogom(Flask):
             d['spawnpoints'] = Pokemon.get_spawnpoints(swLat, swLng, neLat, neLng)
 
         if request.args.get('status', 'false') == 'true':
-            d['main_workers'] = MainWorker.get_all()
-            d['workers'] = WorkerStatus.get_all()
+            args = get_args()
+            d = {}
+            if args.status_page_password is None:
+                d['error'] = 'Access denied'
+            elif request.args.get('password', None) == args.status_page_password:
+                d['main_workers'] = MainWorker.get_all()
+                d['workers'] = WorkerStatus.get_all()
 
         return jsonify(d)
 
@@ -232,7 +238,19 @@ class Pogom(Flask):
                                )
 
     def get_status(self):
+        args = get_args()
+        if args.status_page_password is None:
+            abort(404)
+
         return render_template('status.html')
+
+    def post_status_password(self):
+        args = get_args()
+        if args.status_page_password is None:
+            return 'disable', 200
+        if request.form.get('password', None) == args.status_page_password:
+            return 'ok', 200
+        return 'fail', 200
 
 
 class CustomJSONEncoder(JSONEncoder):

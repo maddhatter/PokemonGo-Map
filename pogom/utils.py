@@ -157,6 +157,8 @@ def get_args():
                         help='Show a status screen instead of log messages. Can switch between status and logs by pressing enter.', default=False)
     parser.add_argument('-sn', '--status-name', default=None,
                         help='Enable status page database update using STATUS_NAME as main worker name')
+    parser.add_argument('-spp', '--status-page-password', default=None,
+                        help='Set the status page password')
     parser.add_argument('-el', '--encrypt-lib', help='Path to encrypt lib to be used instead of the shipped ones')
     parser.set_defaults(DEBUG=False)
 

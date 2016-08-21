@@ -11,8 +11,8 @@ body{
 }
 
 .status_table {
+  width: 100%;
   margin: 0 0 40px 0;
-  width: 95%;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   display: table;
   font-size: 0.8em;
@@ -49,10 +49,13 @@ body{
   }
 }
 
-.worker {
+.status_container {
   width: 95%;
   margin-left: auto;
   margin-right: auto;
+}
+
+.worker {
   display: block;
   padding-left: 2px;
   padding-right: 2px;
@@ -64,3 +67,49 @@ body{
     display: block;
   }
 }
+
+.status_form {
+  position: relative;
+  z-index: 1;
+  background: #FFFFFF;
+  max-width: 360px;
+  margin: 50px auto;
+  padding: 45px;
+  text-align: center;
+  box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+
+  form {
+    padding: 0px;
+    margin: auto;
+  }
+
+  input {
+    font-family: sans-serif;
+    outline: 0;
+    background: #f2f2f2;
+    width: 100%;
+    border: 0;
+    margin: 0 0 15px;
+    padding: 15px;
+    box-sizing: border-box;
+    font-size: 14px;
+  }
+
+  button {
+    font-family: sans-serif;
+    text-transform: uppercase;
+    outline: 0;
+    background: #4CAF50;
+    width: 100%;
+    border: 0;
+    color: #FFFFFF;
+    font-size: 14px;
+    -webkit-transition: all 0.3 ease;
+    transition: all 0.3 ease;
+    cursor: pointer;
+    :hover, :active, :focus {
+      background: #43A047;
+    }
+  }
+}
+
