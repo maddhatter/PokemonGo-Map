@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pokemon Go Map - Status</title>
+
+    <!-- Fav- & Apple-Touch-Icons -->
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="{{ url_for('static', filename='appicons/favicon.ico').lstrip('/') }}" type="image/x-icon">
+    <!-- non-retina iPhone pre iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/114x114.png').lstrip('/') }}" sizes="57x57">
+    <!-- non-retina iPad pre iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/144x144.png').lstrip('/') }}" sizes="72x72">
+    <!-- non-retina iPad iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/152x152.png').lstrip('/') }}" sizes="76x76">
+    <!-- retina iPhone pre iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/114x114.png').lstrip('/') }}" sizes="114x114">
+    <!-- retina iPhone iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/120x120.png').lstrip('/') }}" sizes="120x120">
+    <!-- retina iPad pre iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/144x144.png').lstrip('/') }}" sizes="144x144">
+    <!-- retina iPad iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/152x152.png').lstrip('/') }}" sizes="152x152">
+    <!-- retina iPhone 6 iOS 7 -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='appicons/180x180.png').lstrip('/') }}" sizes="180x180">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='dist/css/app.min.css').lstrip('/') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dist/css/status.min.css').lstrip('/') }}">
+    <script src="{{ url_for('static', filename='js/vendor/modernizr.custom.js').lstrip('/') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.9.1/polyfill.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/skel/3.0.1/skel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js"></script>
+</head>
+<body>
+<!-- Header -->
+<header id="header">
+    <h1><a href="..">Pokémon Go Map</a></h1>
+</header>
+<div id="loading"><img src="{{ url_for('static', filename='images/loading.gif').lstrip('/') }}" alt="Loading"/></div>
+<div class="container" id="status_container" />
+<script src="{{ url_for('static', filename='dist/js/app.min.js').lstrip('/') }}"></script>
+<script src="{{ url_for('static', filename='dist/js/status.min.js').lstrip('/') }}"></script>
+</body>
+</html>

@@ -14,7 +14,7 @@ from datetime import timedelta
 from collections import OrderedDict
 
 from . import config
-from .models import Pokemon, Gym, Pokestop, ScannedLocation
+from .models import Pokemon, Gym, Pokestop, ScannedLocation, MainWorker, WorkerStatus
 
 log = logging.getLogger(__name__)
 compress = Compress()
@@ -33,6 +33,7 @@ class Pogom(Flask):
         self.route("/search_control", methods=['GET'])(self.get_search_control)
         self.route("/search_control", methods=['POST'])(self.post_search_control)
         self.route("/stats", methods=['GET'])(self.get_stats)
+        self.route("/status", methods=['GET'])(self.get_status)
 
     def set_search_control(self, control):
         self.search_control = control
@@ -110,6 +111,10 @@ class Pogom(Flask):
 
         if request.args.get('spawnpoints', 'false') == 'true':
             d['spawnpoints'] = Pokemon.get_spawnpoints(swLat, swLng, neLat, neLng)
+
+        if request.args.get('status', 'false') == 'true':
+            d['main_workers'] = MainWorker.get_all()
+            d['workers'] = WorkerStatus.get_all()
 
         return jsonify(d)
 
@@ -225,6 +230,9 @@ class Pogom(Flask):
                                gmaps_key=config['GMAPS_KEY'],
                                valid_input=self.get_valid_stat_input()
                                )
+
+    def get_status(self):
+        return render_template('status.html')
 
 
 class CustomJSONEncoder(JSONEncoder):
