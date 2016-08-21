@@ -159,7 +159,6 @@ function processWorker (i, worker) {
 // Override UpdateMap in map.js to take advantage of a pre-existing interval.
 function updateStatus (firstRun) {
   loadRawData().done(function (result) {
-    console.log(result)
     $.each(result.main_workers, processMainWorker)
     $.each(result.workers, processWorker)
   })
