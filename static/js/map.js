@@ -1249,7 +1249,7 @@ function updateGymMarker (item, marker) {
 }
 function updateGymIcons () {
   $.each(mapData.gyms, function (key, value) {
-    mapData.gyms[key]['marker'].setIcon('static/forts/' + Store.get('gymMarkerStyle') + '/'  + gymTypes[mapData.gyms[key]['team_id']] + (mapData.gyms[key]['team_id'] !== 0 ? '_' + getGymLevel(mapData.gyms[key]['gym_points']) : '') + '.png')
+    mapData.gyms[key]['marker'].setIcon('static/forts/' + Store.get('gymMarkerStyle') + '/' + gymTypes[mapData.gyms[key]['team_id']] + (mapData.gyms[key]['team_id'] !== 0 ? '_' + getGymLevel(mapData.gyms[key]['gym_points']) : '') + '.png')
   })
 }
 
