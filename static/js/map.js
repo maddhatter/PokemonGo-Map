@@ -1247,6 +1247,11 @@ function updateGymMarker (item, marker) {
   marker.infoWindow.setContent(gymLabel(gymTypes[item['team_id']], item['team_id'], item['gym_points'], item['latitude'], item['longitude']))
   return marker
 }
+function updateGymIcons () {
+  $.each(mapData.gyms, function (key, value) {
+    mapData.gyms[key]['marker'].setIcon('static/forts/' + Store.get('gymMarkerStyle') + '/'  + gymTypes[mapData.gyms[key]['team_id']] + (mapData.gyms[key]['team_id'] !== 0 ? '_' + getGymLevel(mapData.gyms[key]['gym_points']) : '') + '.png')
+  })
+}
 
 function setupPokestopMarker (item) {
   var imagename = item['lure_expiration'] ? 'PstopLured' : 'Pstop'
@@ -1907,6 +1912,7 @@ $(function () {
 
   $selectGymMarkerStyle.on('change', function (e) {
     Store.set('gymMarkerStyle', this.value)
+    updateGymIcons()
   })
 
   $selectGymMarkerStyle.val(Store.get('gymMarkerStyle')).trigger('change')
