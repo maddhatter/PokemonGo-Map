@@ -307,7 +307,7 @@ class Gym(BaseModel):
     longitude = DoubleField()
     last_modified = DateTimeField(index=True)
     last_scanned = DateTimeField(default=datetime.utcnow)
-    
+
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
 
