@@ -4,7 +4,7 @@ import logging
 import calendar
 import sys
 import time
-import math
+import geopy
 from peewee import SqliteDatabase, InsertQuery, \
     IntegerField, CharField, DoubleField, BooleanField, \
     DateTimeField, fn, DeleteQuery, CompositeKey, FloatField
@@ -17,7 +17,7 @@ from base64 import b64encode
 
 from . import config
 from .utils import get_pokemon_name, get_pokemon_rarity, get_pokemon_types, get_args
-from .transform import transform_from_wgs_to_gcj
+from .transform import transform_from_wgs_to_gcj, get_new_coords, generate_location_steps
 from .customLog import printPokemon
 
 log = logging.getLogger(__name__)
@@ -190,17 +190,16 @@ class Pokemon(BaseModel):
         return appearances
 
     @classmethod
-    def get_spawnpoints(cls, swLat, swLng, neLat, neLng):
+    def get_spawnpoints(cls, southBoundary, westBoundary, northBoundary, eastBoundary):
         query = Pokemon.select(Pokemon.latitude, Pokemon.longitude, Pokemon.spawnpoint_id)
 
-        if None not in (swLat, swLng, neLat, neLng):
+        if None not in (northBoundary, southBoundary, westBoundary, eastBoundary):
             query = (query
-                     .where((Pokemon.latitude >= swLat) &
-                            (Pokemon.longitude >= swLng) &
-                            (Pokemon.latitude <= neLat) &
-                            (Pokemon.longitude <= neLng)
-                            )
-                     )
+                     .where((Pokemon.latitude <= northBoundary) &
+                            (Pokemon.latitude >= southBoundary) &
+                            (Pokemon.longitude >= westBoundary) &
+                            (Pokemon.longitude <= eastBoundary)
+                            ))
 
         # Sqlite doesn't support distinct on columns
         if args.db_type == 'mysql':
@@ -212,28 +211,20 @@ class Pokemon(BaseModel):
 
     @classmethod
     def get_spawnpoints_in_hex(cls, center, steps):
-        log.info('got {}steps'.format(steps))
-        # work out hex bounding box
-        hdist = ((steps * 120.0) - 50.0) / 1000.0
-        vdist = ((steps * 105.0) - 35.0) / 1000.0
-        R = 6378.1  # km radius of the earth
-        vang = math.degrees(vdist / R)
-        hang = math.degrees(hdist / (R * math.cos(math.radians(center[0]))))
-        north = center[0] + vang
-        south = center[0] - vang
-        east = center[1] + hang
-        west = center[1] - hang
-        # get all spawns in that box
+        log.info('Finding spawn points {} steps away'.format(steps))
+
+        n, e, s, w = hex_bounds(center, steps)
+
         query = (Pokemon
                  .select(Pokemon.latitude.alias('lat'),
                          Pokemon.longitude.alias('lng'),
                          ((Pokemon.disappear_time.minute * 60) + Pokemon.disappear_time.second).alias('time'),
                          Pokemon.spawnpoint_id
                          ))
-        query = (query.where((Pokemon.latitude <= north) &
-                             (Pokemon.latitude >= south) &
-                             (Pokemon.longitude >= west) &
-                             (Pokemon.longitude <= east)
+        query = (query.where((Pokemon.latitude <= n) &
+                             (Pokemon.latitude >= s) &
+                             (Pokemon.longitude >= w) &
+                             (Pokemon.longitude <= e)
                              ))
         # Sqlite doesn't support distinct on columns
         if args.db_type == 'mysql':
@@ -242,24 +233,26 @@ class Pokemon(BaseModel):
             query = query.group_by(Pokemon.spawnpoint_id)
 
         s = list(query.dicts())
-        # for each spawn work out if it is in the hex (clipping the diagonals)
-        trueSpawns = []
-        for spawn in s:
-            spawn['time'] = (spawn['time'] + 2700) % 3600
-            # get the offset from the center of each spawn in km
-            offset = [math.radians(spawn['lat'] - center[0]) * R, math.radians(spawn['lng'] - center[1]) * (R * math.cos(math.radians(center[0])))]
-            # check agains the 4 lines that make up the diagonals
-            if (offset[1] + (offset[0] * 0.5)) > hdist:  # too far ne
-                continue
-            if (offset[1] - (offset[0] * 0.5)) > hdist:  # too far se
-                continue
-            if ((offset[0] * 0.5) - offset[1]) > hdist:  # too far nw
-                continue
-            if ((0 - offset[1]) - (offset[0] * 0.5)) > hdist:  # too far sw
-                continue
-            # if it gets to here its  a good spawn
-            trueSpawns.append(spawn)
-        return trueSpawns
+
+        # Filter to spawns which actually fall in the hex locations
+        # This loop is about as non-pythonic as you can get, I bet.
+        # Oh well.
+        filtered = []
+        hex_locations = list(generate_location_steps(center, steps, 0.07))
+        for hl in hex_locations:
+            for idx, sp in enumerate(s):
+                if geopy.distance.distance(hl, (sp['lat'], sp['lng'])).meters <= 70:
+                    filtered.append(s.pop(idx))
+
+        # at this point, 'time' is DISAPPEARANCE time, we're going to morph it to APPEARANCE time
+        for location in filtered:
+            # examples: time    shifted
+            #           0       (   0 + 2700) = 2700 % 3600 = 2700 (0th minute to 45th minute, 15 minutes prior to appearance as time wraps around the hour)
+            #           1800    (1800 + 2700) = 4500 % 3600 =  900 (30th minute, moved to arrive at 15th minute)
+            # todo: this DOES NOT ACCOUNT for pokemons that appear sooner and live longer, but you'll _always_ have at least 15 minutes, so it works well enough
+            location['time'] = (location['time'] + 2700) % 3600
+
+        return filtered
 
 
 class Pokestop(BaseModel):
@@ -313,7 +306,6 @@ class Gym(BaseModel):
     latitude = DoubleField()
     longitude = DoubleField()
     last_modified = DateTimeField(index=True)
-    last_scanned = DateTimeField(default=datetime.utcnow)
 
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
@@ -451,6 +443,17 @@ class GymDetails(BaseModel):
     description = CharField(null=True)
     url = CharField()
     last_scanned = DateTimeField(default=datetime.utcnow)
+
+
+def hex_bounds(center, steps):
+    # Make a box that is (70m * step_limit * 2) + 70m away from the center point
+    # Rationale is that you need to travel
+    sp_dist = 0.07 * 2 * steps
+    n = get_new_coords(center, sp_dist, 0)[0]
+    e = get_new_coords(center, sp_dist, 90)[1]
+    s = get_new_coords(center, sp_dist, 180)[0]
+    w = get_new_coords(center, sp_dist, 270)[1]
+    return (n, e, s, w)
 
 
 # todo: this probably shouldn't _really_ be in "models" anymore, but w/e
@@ -625,122 +628,6 @@ def db_updater(args, q):
             log.exception('Exception in db_updater: %s', e)
 
 
-def parse_gyms(args, gym_responses, wh_update_queue):
-    gym_details = {}
-    gym_members = {}
-    gym_pokemon = {}
-    trainers = {}
-
-    i = 0
-    for g in gym_responses.values():
-        gym_state = g['gym_state']
-        gym_id = gym_state['fort_data']['id']
-
-        gym_details[gym_id] = {
-            'gym_id': gym_id,
-            'name': g['name'],
-            'description': g.get('description'),
-            'url': g['urls'][0],
-        }
-
-        if args.webhooks:
-            webhook_data = {
-                'id': gym_id,
-                'latitude': gym_state['fort_data']['latitude'],
-                'longitude': gym_state['fort_data']['longitude'],
-                'team': gym_state['fort_data'].get('owned_by_team', 0),
-                'name': g['name'],
-                'description': g.get('description'),
-                'url': g['urls'][0],
-                'pokemon': [],
-            }
-
-        for member in gym_state.get('memberships', []):
-            gym_members[i] = {
-                'gym_id': gym_id,
-                'pokemon_uid': member['pokemon_data']['id'],
-            }
-
-            gym_pokemon[i] = {
-                'pokemon_uid': member['pokemon_data']['id'],
-                'pokemon_id': member['pokemon_data']['pokemon_id'],
-                'cp': member['pokemon_data']['cp'],
-                'trainer_name': member['trainer_public_profile']['name'],
-                'num_upgrades': member['pokemon_data'].get('num_upgrades', 0),
-                'move_1': member['pokemon_data'].get('move_1'),
-                'move_2': member['pokemon_data'].get('move_2'),
-                'height': member['pokemon_data'].get('height_m'),
-                'weight': member['pokemon_data'].get('weight_kg'),
-                'stamina': member['pokemon_data'].get('stamina'),
-                'stamina_max': member['pokemon_data'].get('stamina_max'),
-                'cp_multiplier': member['pokemon_data'].get('cp_multiplier'),
-                'additional_cp_multiplier': member['pokemon_data'].get('additional_cp_multiplier', 0),
-                'iv_defense': member['pokemon_data'].get('individual_defense', 0),
-                'iv_stamina': member['pokemon_data'].get('individual_stamina', 0),
-                'iv_attack': member['pokemon_data'].get('individual_attack', 0),
-                'last_seen': datetime.utcnow(),
-            }
-
-            trainers[i] = {
-                'name': member['trainer_public_profile']['name'],
-                'team': gym_state['fort_data']['owned_by_team'],
-                'level': member['trainer_public_profile']['level'],
-                'last_seen': datetime.utcnow(),
-            }
-
-            if args.webhooks:
-                webhook_data['pokemon'].append({
-                    'pokemon_uid': member['pokemon_data']['id'],
-                    'pokemon_id': member['pokemon_data']['pokemon_id'],
-                    'cp': member['pokemon_data']['cp'],
-                    'num_upgrades': member['pokemon_data'].get('num_upgrades', 0),
-                    'move_1': member['pokemon_data'].get('move_1'),
-                    'move_2': member['pokemon_data'].get('move_2'),
-                    'height': member['pokemon_data'].get('height_m'),
-                    'weight': member['pokemon_data'].get('weight_kg'),
-                    'stamina': member['pokemon_data'].get('stamina'),
-                    'stamina_max': member['pokemon_data'].get('stamina_max'),
-                    'cp_multiplier': member['pokemon_data'].get('cp_multiplier'),
-                    'additional_cp_multiplier': member['pokemon_data'].get('additional_cp_multiplier', 0),
-                    'iv_defense': member['pokemon_data'].get('individual_defense', 0),
-                    'iv_stamina': member['pokemon_data'].get('individual_stamina', 0),
-                    'iv_attack': member['pokemon_data'].get('individual_attack', 0),
-                    'trainer_name': member['trainer_public_profile']['name'],
-                    'trainer_level': member['trainer_public_profile']['level'],
-                })
-
-            i += 1
-        if args.webhooks:
-            wh_update_queue.put(('gym_details', webhook_data))
-
-    # All this database stuff is synchronous (not using the upsert queue) on purpose.
-    # Since the search workers load the GymDetails model from the database to determine if a gym
-    # needs rescanned, we need to be sure the GymDetails get fully committed to the database before moving on.
-    #
-    # We _could_ synchronously upsert GymDetails, then queue the other tables for
-    # upsert, but that would put that Gym's overall information in a weird non-atomic state.
-
-    # upsert all the models
-    if len(gym_details):
-        bulk_upsert(GymDetails, gym_details)
-    if len(gym_pokemon):
-        bulk_upsert(GymPokemon, gym_pokemon)
-    if len(trainers):
-        bulk_upsert(Trainer, trainers)
-
-    # get rid of all the gym members, we're going to insert new records
-    if len(gym_details):
-        DeleteQuery(GymMember).where(GymMember.gym_id << gym_details.keys()).execute()
-
-    # insert new gym members
-    if len(gym_members):
-        bulk_upsert(GymMember, gym_members)
-
-    log.info('Upserted %d gyms and %d gym members',
-             len(gym_details),
-             len(gym_members))
-
-
 def clean_db_loop(args):
     while True:
         try:
@@ -771,7 +658,7 @@ def bulk_upsert(cls, data):
     step = 120
 
     while i < num_rows:
-        log.debug('Inserting items %d to %d into %s', i, min(i + step, num_rows), cls)
+        log.debug('Inserting items %d to %d', i, min(i + step, num_rows))
         try:
             InsertQuery(cls, rows=data.values()[i:min(i + step, num_rows)]).upsert().execute()
         except Exception as e:
@@ -858,8 +745,3 @@ def database_migrate(db, old_ver):
                  .where(Pokemon.disappear_time >
                         (datetime.utcnow() - timedelta(hours=24))))
         query.execute()
-
-    if old_ver < 6:
-        migrate(
-            migrator.add_column('gym', 'last_scanned', DateTimeField(null=True)),
-        )
