@@ -34,7 +34,7 @@ class Pogom(Flask):
         self.route("/search_control", methods=['POST'])(self.post_search_control)
         self.route("/stats", methods=['GET'])(self.get_stats)
         self.route("/status", methods=['GET'])(self.get_status)
-        self.route("/status_password", methods=['POST'])(self.post_status_password)
+        self.route("/status", methods=['POST'])(self.post_status)
 
     def set_search_control(self, control):
         self.search_control = control
@@ -244,13 +244,19 @@ class Pogom(Flask):
 
         return render_template('status.html')
 
-    def post_status_password(self):
+    def post_status(self):
         args = get_args()
+        d = {}
         if args.status_page_password is None:
-            return 'disable', 200
+            abort(404)
+
         if request.form.get('password', None) == args.status_page_password:
-            return 'ok', 200
-        return 'fail', 200
+            d['login'] = 'ok'
+            d['main_workers'] = MainWorker.get_all()
+            d['workers'] = WorkerStatus.get_all()
+        else:
+            d['login'] = 'failed'
+        return jsonify(d)
 
 
 class CustomJSONEncoder(JSONEncoder):

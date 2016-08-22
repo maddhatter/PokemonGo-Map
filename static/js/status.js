@@ -38,15 +38,9 @@ function hashFnv32a (str, asString, seed) {
 
 function loadRawData () {
   return $.ajax({
-    url: 'raw_data',
-    type: 'GET',
+    url: 'status',
+    type: 'post',
     data: {
-      'pokemon': false,
-      'pokestops': false,
-      'gyms': false,
-      'scanned': false,
-      'seen': false,
-      'status': true,
       'password': statusPagePassword
     },
     dataType: 'json',
@@ -174,34 +168,27 @@ function processWorker (i, worker) {
   $('#message_' + hash).html(worker['message'])
 }
 
-// Override UpdateMap in map.js to take advantage of a pre-existing interval.
+function parseResult (result) {
+  if (groupByWorker) {
+    $.each(result.main_workers, processMainWorker)
+  }
+  $.each(result.workers, processWorker)
+}
+
 function updateStatus (firstRun) {
   loadRawData().done(function (result) {
-    if (groupByWorker) {
-      $.each(result.main_workers, processMainWorker)
-    }
-    $.each(result.workers, processWorker)
+    parseResult(result)
   })
 }
 
 $('#password_form').submit(function (event) {
   event.preventDefault()
   statusPagePassword = $('#password').val()
-  $.ajax({
-    url: 'status_password',
-    type: 'POST',
-    data: {
-      'password': statusPagePassword
-    },
-    dataType: 'text'
-  }).done(function (result) {
-    if (result === 'ok') {
+  loadRawData().done(function (result) {
+    if (result.login === 'ok') {
       $('.status_form').remove()
-      updateStatus()
       window.setInterval(updateStatus, 5000)
-    } else if (result === 'disable') {
-      $('.status_form').remove()
-      $('<h1>Status page disabled</h1>').appendTo('#status_container')
+      parseResult(result)
     } else {
       $('.status_form').effect('bounce')
     }
