@@ -535,7 +535,7 @@ def search_worker_thread(args, account, search_items_queue, pause_bit, encryptio
                         log.debug(status['message'])
 
                         for gym in gyms_to_update.values():
-                            status['message'] = 'Updating gym {} of {} for location {},{}...'.format(current_gym, len(gyms_to_update), step_location[0], step_location[1])
+                            status['message'] = 'Getting details for gym {} of {} for location {},{}...'.format(current_gym, len(gyms_to_update), step_location[0], step_location[1])
                             time.sleep(random.random() + 2)
                             response = gym_request(api, step_location, gym)
 
@@ -548,7 +548,7 @@ def search_worker_thread(args, account, search_items_queue, pause_bit, encryptio
                             # increment which gym we're on (for status messages)
                             current_gym += 1
 
-                        status['message'] = 'Parsing {} gym details for location {},{}...'.format(len(gyms_to_update), step_location[0], step_location[1])
+                        status['message'] = 'Processing details of {} gyms for location {},{}...'.format(len(gyms_to_update), step_location[0], step_location[1])
                         log.debug(status['message'])
 
                         if gym_responses:
