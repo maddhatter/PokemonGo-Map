@@ -507,12 +507,13 @@ def search_worker_thread(args, account, search_items_queue, pause_bit, encryptio
                     status['message'] = 'Search at {:6f},{:6f} completed with {} finds'.format(step_location[0], step_location[1], parsed['count'])
                     log.debug(status['message'])
                 except KeyError:
+                    parsed = False
                     status['fail'] += 1
                     status['message'] = 'Map parse failed at {:6f},{:6f}, abandoning location'.format(step_location[0], step_location[1])
                     log.exception(status['message'])
 
                 # Get detailed information about gyms
-                if args.gym_info:
+                if args.gym_info and parsed:
                     # build up a list of gyms to update
                     gyms_to_update = {}
                     for gym in parsed['gyms'].values():
