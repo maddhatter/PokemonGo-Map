@@ -350,7 +350,6 @@ class Gym(BaseModel):
                               (Gym.longitude <= neLng))
                        .dicts())
 
-
         # Performance: Disable the garbage collector prior to creating a (potentially) large dict with append()
         gc.disable()
 
