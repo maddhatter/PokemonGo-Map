@@ -888,3 +888,8 @@ def database_migrate(db, old_ver):
                  .where(Pokemon.disappear_time >
                         (datetime.utcnow() - timedelta(hours=24))))
         query.execute()
+
+    if old_ver < 6:
+        migrate(
+            migrator.add_column('gym', 'last_scanned', DateTimeField(null=True)),
+        )
