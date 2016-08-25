@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 args = get_args()
 flaskDb = FlaskDB()
 
-db_schema_version = 6
+db_schema_version = 7
 
 
 class MyRetryDB(RetryOperationalError, PooledMySQLDatabase):
@@ -79,32 +79,38 @@ class Pokemon(BaseModel):
     latitude = DoubleField()
     longitude = DoubleField()
     disappear_time = DateTimeField(index=True)
+    discovered_time = DateTimeField(index=True, default=datetime.utcnow)
 
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
 
     @staticmethod
-    def get_active(swLat, swLng, neLat, neLng):
-        if swLat is None or swLng is None or neLat is None or neLng is None:
-            query = (Pokemon
-                     .select()
-                     .where(Pokemon.disappear_time > datetime.utcnow())
-                     .dicts())
-        else:
-            query = (Pokemon
-                     .select()
-                     .where((Pokemon.disappear_time > datetime.utcnow()) &
-                            (((Pokemon.latitude >= swLat) &
-                              (Pokemon.longitude >= swLng) &
-                              (Pokemon.latitude <= neLat) &
-                              (Pokemon.longitude <= neLng))))
-                     .dicts())
+    def get_active(swLat, swLng, neLat, neLng, since):
+        query = (Pokemon
+             .select(Pokemon.encounter_id,
+                     Pokemon.pokemon_id,
+                     Pokemon.latitude,
+                     Pokemon.longitude,
+                     Pokemon.disappear_time)
+             .where((Pokemon.disappear_time > datetime.utcnow())))
+
+        if swLat and swLng and neLat and neLng:
+            query = (query
+                     .where((Pokemon.latitude >= swLat) &
+                            (Pokemon.longitude >= swLng) &
+                            (Pokemon.latitude <= neLat) &
+                            (Pokemon.longitude <= neLng)))
+
+        if since:
+            query = query.where((Pokemon.discovered_time > datetime.utcfromtimestamp(int(since) / 1000)) | Pokemon.discovered_time.is_null(True))
+
+        results = query.dicts()
 
         # Performance: Disable the garbage collector prior to creating a (potentially) large dict with append()
         gc.disable()
 
         pokemons = []
-        for p in query:
+        for p in results:
             p['pokemon_name'] = get_pokemon_name(p['pokemon_id'])
             p['pokemon_rarity'] = get_pokemon_rarity(p['pokemon_id'])
             p['pokemon_types'] = get_pokemon_types(p['pokemon_id'])
@@ -119,29 +125,33 @@ class Pokemon(BaseModel):
         return pokemons
 
     @staticmethod
-    def get_active_by_id(ids, swLat, swLng, neLat, neLng):
-        if swLat is None or swLng is None or neLat is None or neLng is None:
-            query = (Pokemon
-                     .select()
-                     .where((Pokemon.pokemon_id << ids) &
-                            (Pokemon.disappear_time > datetime.utcnow()))
-                     .dicts())
-        else:
-            query = (Pokemon
-                     .select()
-                     .where((Pokemon.pokemon_id << ids) &
-                            (Pokemon.disappear_time > datetime.utcnow()) &
-                            (Pokemon.latitude >= swLat) &
+    def get_active_by_id(ids, swLat, swLng, neLat, neLng, since):
+        query = (Pokemon
+                 .select(Pokemon.encounter_id,
+                         Pokemon.pokemon_id,
+                         Pokemon.latitude,
+                         Pokemon.longitude,
+                         Pokemon.disappear_time)
+                 .where((Pokemon.pokemon_id << ids) &
+                        (Pokemon.disappear_time > datetime.utcnow())))
+
+        if swLat and swLng and neLat and neLng:
+            query = (query
+                     .where((Pokemon.latitude >= swLat) &
                             (Pokemon.longitude >= swLng) &
                             (Pokemon.latitude <= neLat) &
-                            (Pokemon.longitude <= neLng))
-                     .dicts())
+                            (Pokemon.longitude <= neLng)))
+
+        if since:
+            query = query.where((Pokemon.discovered_time > datetime.utcfromtimestamp(int(since) / 1000)) | Pokemon.discovered_time.is_null(True))
+
+        results = query.dicts()
 
         # Performance: Disable the garbage collector prior to creating a (potentially) large dict with append()
         gc.disable()
 
         pokemons = []
-        for p in query:
+        for p in results:
             p['pokemon_name'] = get_pokemon_name(p['pokemon_id'])
             p['pokemon_rarity'] = get_pokemon_rarity(p['pokemon_id'])
             p['pokemon_types'] = get_pokemon_types(p['pokemon_id'])
@@ -281,30 +291,36 @@ class Pokestop(BaseModel):
     last_modified = DateTimeField(index=True)
     lure_expiration = DateTimeField(null=True, index=True)
     active_fort_modifier = CharField(max_length=50, null=True)
+    last_scanned = DateTimeField(null=True, default=datetime.utcnow, index=True)
 
     class Meta:
         indexes = ((('latitude', 'longitude'), False),)
 
     @staticmethod
-    def get_stops(swLat, swLng, neLat, neLng):
-        if swLat is None or swLng is None or neLat is None or neLng is None:
-            query = (Pokestop
-                     .select()
-                     .dicts())
-        else:
-            query = (Pokestop
-                     .select()
-                     .where((Pokestop.latitude >= swLat) &
-                            (Pokestop.longitude >= swLng) &
-                            (Pokestop.latitude <= neLat) &
-                            (Pokestop.longitude <= neLng))
-                     .dicts())
+    def get_stops(swLat, swLng, neLat, neLng, since):
+        query = (Pokestop
+                 .select())
+        if swLat or swLng or neLat or neLng:
+            query = (query
+                        .where((Pokestop.latitude >= swLat) &
+                               (Pokestop.longitude >= swLng) &
+                               (Pokestop.latitude <= neLat) &
+                               (Pokestop.longitude <= neLng)))
+        
+
+        if since:
+            sinceDate = datetime.utcfromtimestamp(int(since) / 1000)
+            query = query.where(Pokestop.last_modified > sinceDate & ((Pokestop.last_scanned > sinceDate) | Pokestop.last_scanned.is_null(True)))
+
+        log.info(query.sql())
+
+        results = query.dicts()
 
         # Performance: Disable the garbage collector prior to creating a (potentially) large dict with append()
         gc.disable()
 
         pokestops = []
-        for p in query:
+        for p in results:
             if args.china:
                 p['latitude'], p['longitude'] = \
                     transform_from_wgs_to_gcj(p['latitude'], p['longitude'])
@@ -336,19 +352,20 @@ class Gym(BaseModel):
         indexes = ((('latitude', 'longitude'), False),)
 
     @staticmethod
-    def get_gyms(swLat, swLng, neLat, neLng):
-        if swLat is None or swLng is None or neLat is None or neLng is None:
-            results = (Gym
-                       .select()
-                       .dicts())
-        else:
-            results = (Gym
-                       .select()
-                       .where((Gym.latitude >= swLat) &
-                              (Gym.longitude >= swLng) &
-                              (Gym.latitude <= neLat) &
-                              (Gym.longitude <= neLng))
-                       .dicts())
+    def get_gyms(swLat, swLng, neLat, neLng, since):
+        query = Gym.select()
+
+        if swLat and swLng and neLat and neLng:
+            query = (query
+                     .where((Gym.latitude >= swLat) &
+                            (Gym.longitude >= swLng) &
+                            (Gym.latitude <= neLat) &
+                            (Gym.longitude <= neLng)))
+
+        if since:
+            query = query.where(Gym.last_scanned > datetime.utcfromtimestamp(int(since) / 1000))
+
+        results = query.dicts()
 
         # Performance: Disable the garbage collector prior to creating a (potentially) large dict with append()
         gc.disable()
@@ -892,4 +909,10 @@ def database_migrate(db, old_ver):
     if old_ver < 6:
         migrate(
             migrator.add_column('gym', 'last_scanned', DateTimeField(null=True)),
+        )
+
+    if old_ver < 7:
+        migrate(
+            migrator.add_column('pokemon', 'discovered_time', DateTimeField(null=True)),
+            migrator.add_column('pokemon', 'last_scanned', DateTimeField(null=True))
         )

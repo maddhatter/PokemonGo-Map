@@ -785,6 +785,13 @@ var StoreOptions = {
   'zoomLevel': {
     default: 16,
     type: StoreTypes.Number
+  },
+  'lastLoad': {
+    default: {
+      'bounds': null,
+      'time': null
+    },
+    type: StoreTypes.JSON
   }
 }
 
@@ -922,6 +929,8 @@ function initMap () { // eslint-disable-line no-unused-vars
 
   addMyLocationButton()
   initSidebar()
+
+  Store.reset('lastLoad')
 }
 
 function updateSearchMarker (style) {
@@ -1440,6 +1449,13 @@ function loadRawData () {
   var swLng = swPoint.lng()
   var neLat = nePoint.lat()
   var neLng = nePoint.lng()
+  var since = null
+
+  if (bounds.equals(Store.get('lastLoad').bounds)) {
+    since = Store.get('lastLoad').time
+  }
+
+  var loadStart = Date.now()
 
   return $.ajax({
     url: 'raw_data',
@@ -1453,7 +1469,8 @@ function loadRawData () {
       'swLat': swLat,
       'swLng': swLng,
       'neLat': neLat,
-      'neLng': neLng
+      'neLng': neLng,
+      'since': since
     },
     dataType: 'json',
     cache: false,
@@ -1465,6 +1482,10 @@ function loadRawData () {
       }
     },
     complete: function () {
+      Store.set('lastLoad', {
+        'bounds': bounds,
+        'time': loadStart
+      })
       rawDataIsLoading = false
     }
   })
