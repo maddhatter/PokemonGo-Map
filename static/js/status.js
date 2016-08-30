@@ -68,7 +68,7 @@ function addTable (hash) {
           Success
         </div>
         <div class="status_cell">
-          Faill
+          Fail
         </div>
         <div class="status_cell">
           No Items
