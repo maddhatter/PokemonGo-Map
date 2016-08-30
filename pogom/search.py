@@ -171,6 +171,9 @@ def status_printer(threadStatus, search_items_queue, db_updates_queue, wh_queue)
 
 
 def worker_status_db_thread(threads_status, name, db_updates_queue):
+    log.info("Clearing previous statuses for '%s' worker", name)
+    WorkerStatus.delete().where(WorkerStatus.worker_name == name).execute()
+
     while True:
         workers = {}
         overseer = None
