@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 args = get_args()
 flaskDb = FlaskDB()
 
-db_schema_version = 7
+db_schema_version = 8
 
 
 class MyRetryDB(RetryOperationalError, PooledMySQLDatabase):
@@ -466,7 +466,7 @@ class GymMember(BaseModel):
     last_scanned = DateTimeField(default=datetime.utcnow)
 
     class Meta:
-        primary_key = False
+        primary_key = CompositeKey('gym_id', 'pokemon_uid')
 
 
 class GymPokemon(BaseModel):
@@ -762,16 +762,13 @@ def parse_gyms(args, gym_responses, wh_update_queue):
     if len(trainers):
         bulk_upsert(Trainer, trainers)
 
-    # This needs to be completed in a transaction, because we don't wany any other thread or process
-    # to mess with the GymMembers for the gyms we're updating while we're updating the bridge table.
-    with flaskDb.database.transaction():
-        # get rid of all the gym members, we're going to insert new records
-        if len(gym_details):
-            DeleteQuery(GymMember).where(GymMember.gym_id << gym_details.keys()).execute()
+    # get rid of all the gym members, we're going to insert new records
+    if len(gym_details):
+        DeleteQuery(GymMember).where(GymMember.gym_id << gym_details.keys()).execute()
 
-        # insert new gym members
-        if len(gym_members):
-            bulk_upsert(GymMember, gym_members)
+    # insert new gym members
+    if len(gym_members):
+        bulk_upsert(GymMember, gym_members)
 
     log.info('Upserted %d gyms and %d gym members',
              len(gym_details),
@@ -940,3 +937,6 @@ def database_migrate(db, old_ver):
             migrator.drop_column('gymdetails', 'description'),
             migrator.add_column('gymdetails', 'description', TextField(null=True, default=""))
         )
+
+    if old_ver < 8 and old_ver >= 6:  # only do this if the GymMember table exists, it was introduced in v6
+        db.drop_tables([GymMember])
