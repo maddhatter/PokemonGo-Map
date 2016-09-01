@@ -74,7 +74,7 @@ function addTable (hash) {
           No Items
         </div>
         <div class="status_cell">
-          Skiped
+          Skipped
         </div>
         <div class="status_cell">
           Last Modified
