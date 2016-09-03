@@ -790,7 +790,7 @@ var StoreOptions = {
     type: StoreTypes.String
   },
   'gymMarkerStyle': {
-    default: 'shield',
+    default: 'ingame',
     type: StoreTypes.String
   },
   'zoomLevel': {
