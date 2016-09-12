@@ -533,7 +533,7 @@ function isRangeActive (map) {
 
 function customizePokemonMarker (marker, item, skipNotification) {
   var isLured = item['pokestop_id'] !== null
-  
+
   marker.addListener('click', function () {
     this.setAnimation(null)
     this.animationDisabled = true
